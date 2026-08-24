@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AIR — Algorithm Intermediate Representation Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#090c11;
+    --panel:#10151d;
+    --panel-2:#141c27;
+    --inset:#0b0f16;
+    --line:#212b37;
+    --line-soft:#181f29;
+    --text-hi:#e9eff5;
+    --text-mid:#8ea0b2;
+    --text-dim:#4d5a68;
+    --accent:#3fe0c5;
+    --accent-dim:rgba(63,224,197,.13);
+    --accent-glow:rgba(63,224,197,.35);
+    --blue:#5b8def;
+    --blue-dim:rgba(91,141,239,.14);
+    --warn:#f0a93b;
+    --warn-dim:rgba(240,169,59,.14);
+    --violet:#a78bfa;
+    --violet-dim:rgba(167,139,250,.14);
+    --font-mono:'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    --font-sans:'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+    --line-h:22px;
+    --pad-top:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--void);
+    color:var(--text-hi);
+    font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  ::selection{background:var(--accent-glow);color:#04140f;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;border:2px solid var(--panel);}
+  ::-webkit-scrollbar-thumb:hover{background:#2c3947;}
+
+  .stage{
+    position:relative;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    background-image:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(63,224,197,.05), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 0%, rgba(91,141,239,.05), transparent 55%),
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:auto, auto, 34px 34px, 34px 34px;
+    background-position:0 0,0 0,-1px -1px,-1px -1px;
+  }
+  .stage:before{
+    content:"";
+    position:absolute;inset:0;
+    background:radial-gradient(circle at 50% 40%, transparent 0%, var(--void) 88%);
+    pointer-events:none;
+    opacity:.9;
+  }
+
+  /* ---------- topbar ---------- */
+  .topbar{
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+    padding:14px 22px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(16,21,29,.9), rgba(16,21,29,.55));
+    backdrop-filter:blur(6px);
+    flex-wrap:wrap;
+    z-index:5;
+  }
+  .brand{display:flex;align-items:center;gap:14px;min-width:0;}
+  .brand-mark{
+    font-family:var(--font-mono);
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:.14em;
+    color:var(--void);
+    background:linear-gradient(135deg, var(--accent), #7af0dd);
+    padding:7px 10px;
+    border-radius:6px;
+    box-shadow:0 0 0 1px rgba(63,224,197,.35), 0 6px 18px -6px rgba(63,224,197,.5);
+    flex:none;
+  }
+  .brand-text h1{
+    font-size:14.5px;
+    margin:0;
+    font-weight:600;
+    letter-spacing:.01em;
+    color:var(--text-hi);
+    white-space:nowrap;
+  }
+  .brand-text p{
+    margin:1px 0 0;
+    font-size:11.5px;
+    color:var(--text-mid);
+    font-family:var(--font-mono);
+    white-space:nowrap;
+  }
+  .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+
+  .lang-chips{display:flex;gap:4px;background:var(--inset);padding:4px;border-radius:9px;border:1px solid var(--line);}
+  .lang-chip{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:.03em;
+    color:var(--text-mid);
+    background:transparent;
+    border:none;
+    padding:6px 11px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:color .15s ease, background .15s ease;
+  }
+  .lang-chip:hover{color:var(--text-hi);}
+  .lang-chip.active{background:var(--panel-2);color:var(--accent);box-shadow:inset 0 0 0 1px rgba(63,224,197,.3);}
+
+  select#exampleSelect{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    color:var(--text-hi);
+    background:var(--inset);
+    border:1px solid var(--line);
+    padding:8px 10px;
+    border-radius:8px;
+    cursor:pointer;
+    outline:none;
+  }
+  select#exampleSelect:focus{box-shadow:0 0 0 2px rgba(63,224,197,.25);}
+
+  .mode-toggle{
+    font-family:var(--font-mono);
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.04em;
+    color:var(--accent);
+    background:var(--accent-dim);
+    border:1px solid rgba(63,224,197,.35);
+    padding:8px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    display:flex;align-items:center;gap:7px;
+    transition:.15s ease;
+  }
+  .mode-toggle .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent-glow);animation:blink 1.6s ease-in-out infinite;}
+  .mode-toggle[data-mode="step"]{color:var(--violet);background:var(--violet-dim);border-color:rgba(167,139,250,.35);}
+  .mode-toggle[data-mode="step"] .dot{background:var(--violet);box-shadow:0 0 8px rgba(167,139,250,.5);animation:none;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  /* ---------- workbench ---------- */
+  .workbench{
+    position:relative;
+    flex:1;
+    display:grid;
+    grid-template-columns:1.05fr .9fr 1.15fr;
+    gap:1px;
+    background:var(--line);
+    overflow:hidden;
+    z-index:2;
+  }
+  .panel{
+    background:var(--panel);
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    overflow:hidden;
+  }
+  .panel-head{
+    position:relative;
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    padding:11px 16px;
+    border-bottom:1px solid var(--line);
+    background:var(--panel-2);
+    flex:none;
+  }
+  .panel-head h2{
+    margin:0;
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.16em;
+    color:var(--text-mid);
+    font-family:var(--font-mono);
+  }
+  .panel-sub{
+    margin-left:auto;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:var(--text-dim);
+  }
+  .tick{position:absolute;width:7px;height:7px;border-color:var(--line);opacity:.9;}
+  .tick.tl{top:6px;left:6px;border-top:1.5px solid var(--accent);border-left:1.5px solid var(--accent);opacity:.55;}
+  .tick.tr{top:6px;right:6px;border-top:1.5px solid var(--accent);border-right:1.5px solid var(--accent);opacity:.55;}
+
+  /* ---------- source panel ---------- */
+  .editor-wrap{
+    position:relative;
+    flex:1;
+    overflow-y:auto;
+    overflow-x:hidden;
+    display:flex;
+  }
+  .gutter{
+    flex:none;
+    width:42px;
+    padding:var(--pad-top) 0;
+    text-align:right;
+    font-family:var(--font-mono);
+    font-size:13px;
+    line-height:var(--line-h);
+    color:var(--text-dim);
+    user-select:none;
+    background:var(--inset);
+    border-right:1px solid var(--line);
+  }
+  .gutter .gline{padding-right:11px;cursor:pointer;transition:color .15s;}
+  .gutter .gline:hover{color:var(--accent);}
+  .gutter .gline.active{color:var(--accent);font-weight:600;}
+
+  .code-area{
+    position:relative;
+    flex:1;
+    min-width:0;
+  }
+  .current-line-marker{
+    position:absolute;
+    left:0;right:0;
+    height:var(--line-h);
+    top:var(--pad-top);
+    background:linear-gradient(90deg, rgba(63,224,197,.14), rgba(63,224,197,.02) 70%);
+    border-left:2px solid var(--accent);
+    pointer-events:none;
+    transition:top .28s cubic-bezier(.22,.8,.25,1);
+    z-index:1;
+  }
+  .current-line-marker.hidden-marker{opacity:0;}
+  .highlight-layer, textarea#codeInput{
+    margin:0;
+    padding:var(--pad-top) 16px;
+    font-family:var(--font-mono);
+    font-size:13.5px;
+    line-height:var(--line-h);
+    white-space:pre;
+    tab-size:2;
+    width:100%;
+    min-height:100%;
+  }
+  .highlight-layer{
+    position:relative;
+    z-index:2;
+    color:var(--text-hi);
+    pointer-events:none;
+  }
+  textarea#codeInput{
+    position:absolute;
+    inset:0;
+    z-index:3;
+    background:transparent;
+    color:transparent;
+    caret-color:var(--accent);
+    border:none;
+    outline:none;
+    resize:none;
+    overflow:hidden;
+  }
+  .tok-kw{color:var(--violet);}
+  .tok-type{color:var(--blue);}
+  .tok-str{color:var(--accent);}
+  .tok-num{color:#f0a93b;}
+  .tok-com{color:var(--text-dim);font-style:italic;}
+  .tok-fn{color:#7cc7ff;}
+  .tok-punct{color:#7c8a99;}
+
+  /* ---------- AIR panel ---------- */
+  .air-list{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;}
+  .air-empty, .viz-empty-msg{
+    margin:auto;
+    text-align:center;
+    color:var(--text-dim);
+    font-family:var(--font-mono);
+    font-size:12px;
+    padding:30px 16px;
+    line-height:1.7;
+  }
+  .air-ticket{
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    border-radius:8px;
+    padding:8px 10px;
+    cursor:pointer;
+    transition:border-color .15s, background .15s, transform .15s;
+    font-family:var(--font-mono);
+  }
+  .air-ticket:hover{border-color:#2c3947;}
+  .air-ticket.current{
+    border-color:var(--accent);
+    background:linear-gradient(180deg, rgba(63,224,197,.09), rgba(63,224,197,.02));
+    box-shadow:0 0 0 1px rgba(63,224,197,.25), 0 6px 16px -8px rgba(63,224,197,.4);
+  }
+  .air-ticket.warning{border-color:var(--warn);background:linear-gradient(180deg, rgba(240,169,59,.1), rgba(240,169,59,.02));}
+  .air-ticket-top{display:flex;align-items:center;gap:8px;margin-bottom:3px;}
+  .air-type{font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 6px;border-radius:4px;}
+  .air-line{margin-left:auto;font-size:10px;color:var(--text-dim);}
+  .air-note{font-size:11.5px;color:var(--text-mid);line-height:1.5;}
+  .air-ticket.current .air-note{color:var(--text-hi);}
+
+  .air-type.c-create{background:var(--blue-dim);color:var(--blue);}
+  .air-type.c-push{background:var(--accent-dim);color:var(--accent);}
+  .air-type.c-pop{background:var(--violet-dim);color:var(--violet);}
+  .air-type.c-var{background:rgba(233,239,245,.08);color:var(--text-hi);}
+  .air-type.c-loop{background:rgba(233,239,245,.06);color:var(--text-mid);}
+  .air-type.c-anomaly{background:var(--warn-dim);color:var(--warn);}
+  .air-type.c-cond{background:var(--violet-dim);color:var(--violet);}
+  .air-type.c-op{background:var(--accent-dim);color:var(--accent);}
+  .air-type.c-print{background:rgba(233,239,245,.06);color:var(--text-mid);}
+  .air-type.c-unknown{background:rgba(233,239,245,.05);color:var(--text-dim);border:1px dashed var(--line);}
+
+  /* ---------- visualization panel ---------- */
+  .viz-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;}
+  .viz-empty{
+    flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;
+  }
+  .viz-empty svg{opacity:.5;}
+  .anomaly-banner{
+    display:flex;gap:10px;align-items:flex-start;
+    border:1px solid rgba(240,169,59,.4);
+    background:linear-gradient(180deg, rgba(240,169,59,.12), rgba(240,169,59,.03));
+    border-radius:10px;
+    padding:12px 14px;
+    animation:pop-in .25s cubic-bezier(.22,.8,.25,1);
+  }
+  .anomaly-banner .ic{flex:none;font-size:16px;line-height:1;color:var(--warn);}
+  .anomaly-banner .msg{flex:1;font-size:12.5px;line-height:1.55;color:#ffd89b;}
+  .anomaly-banner .msg b{color:var(--warn);}
+  .anomaly-banner button{
+    flex:none;font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--void);
+    background:var(--warn);border:none;border-radius:6px;padding:6px 10px;cursor:pointer;
+  }
+  @keyframes pop-in{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+
+  .viz-section{display:flex;flex-direction:column;gap:8px;}
+  .viz-section-label{
+    font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--text-dim);
+    display:flex;align-items:center;gap:8px;
+  }
+  .viz-section-label .name{color:var(--text-mid);}
+  .viz-section-label .type-pill{
+    font-size:9px;padding:2px 6px;border-radius:4px;background:var(--panel-2);border:1px solid var(--line);letter-spacing:.05em;
+  }
+
+  .row-track{position:relative;padding:6px 0 26px;}
+  .row-cells{display:flex;gap:6px;flex-wrap:wrap;position:relative;min-height:46px;}
+  .col-cells{display:flex;flex-direction:column-reverse;gap:6px;width:76px;position:relative;}
+  .cell{
+    position:relative;
+    min-width:46px;height:44px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:8px;
+    font-family:var(--font-mono);
+    font-weight:600;
+    font-size:14px;
+    color:var(--text-hi);
+    flex:none;
+  }
+  .cell .idx{
+    position:absolute;bottom:-18px;left:0;right:0;text-align:center;
+    font-size:9.5px;color:var(--text-dim);font-weight:400;
+  }
+  .cell.flash{animation:flash-cell .6s ease;}
+  @keyframes flash-cell{
+    0%{background:var(--accent-dim);border-color:var(--accent);box-shadow:0 0 0 3px rgba(63,224,197,.18);}
+    100%{background:var(--panel-2);border-color:var(--line);box-shadow:none;}
+  }
+  .cell-enter{animation:cell-in .32s cubic-bezier(.22,.9,.3,1.2);}
+  @keyframes cell-in{from{opacity:0;transform:scale(.5) translateY(6px);}to{opacity:1;transform:none;}}
+  .cell-leave{animation:cell-out .28s ease forwards;pointer-events:none;}
+  @keyframes cell-out{to{opacity:0;transform:scale(.55) translateY(-6px);}}
+
+  .stack-frame{position:relative;padding:4px 0 4px 0;}
+  .stack-top-label{
+    position:absolute;left:82px;top:0;
+    font-family:var(--font-mono);font-size:9.5px;color:var(--accent);letter-spacing:.1em;
+    display:flex;align-items:center;gap:4px;
+  }
+  .cell.stack-cell{width:76px;}
+
+  .queue-labels{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:9.5px;color:var(--text-dim);letter-spacing:.08em;padding:0 2px 4px;}
+  .queue-labels .front{color:var(--accent);}
+  .queue-labels .back{color:var(--violet);}
+
+  .pointer-track{position:relative;height:20px;margin-top:4px;}
+  .pointer{
+    position:absolute;top:0;
+    display:flex;flex-direction:column;align-items:center;gap:1px;
+    transform:translateX(-50%);
+    transition:left .32s cubic-bezier(.22,.8,.25,1);
+    white-space:nowrap;
+  }
+  .pointer .tri{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:6px solid var(--warn);}
+  .pointer .lbl{font-family:var(--font-mono);font-size:9.5px;color:var(--warn);font-weight:700;}
+  .pointer.p1 .tri{border-bottom-color:var(--warn);} .pointer.p1 .lbl{color:var(--warn);}
+  .pointer.p2 .tri{border-bottom-color:var(--blue);} .pointer.p2 .lbl{color:var(--blue);}
+  .pointer.p3 .tri{border-bottom-color:var(--violet);} .pointer.p3 .lbl{color:var(--violet);}
+  .pointer.p4 .tri{border-bottom-color:#7cc7ff;} .pointer.p4 .lbl{color:#7cc7ff;}
+
+  .var-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .var-chip{
+    display:flex;align-items:baseline;gap:7px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:7px 11px;font-family:var(--font-mono);font-size:12.5px;
+  }
+  .var-chip .vn{color:var(--text-mid);}
+  .var-chip .veq{color:var(--text-dim);}
+  .var-chip .vv{color:var(--text-hi);font-weight:600;transition:color .2s;}
+  .var-chip.flash{animation:flash-chip .6s ease;}
+  @keyframes flash-chip{
+    0%{border-color:var(--accent);box-shadow:0 0 0 3px rgba(63,224,197,.16);}
+    100%{border-color:var(--line);box-shadow:none;}
+  }
+
+  .output-console{
+    background:var(--inset);border:1px solid var(--line);border-radius:8px;
+    padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--text-mid);
+    max-height:120px;overflow-y:auto;
+  }
+  .output-console .oline{padding:2px 0;}
+  .output-console .oline:before{content:"› ";color:var(--accent);}
+
+  /* ---------- timeline ---------- */
+  .timeline{
+    flex:none;
+    display:flex;align-items:center;gap:12px;
+    padding:11px 20px;
+    border-top:1px solid var(--line);
+    background:var(--panel-2);
+    z-index:5;
+  }
+  .tbtn{
+    width:32px;height:32px;flex:none;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--inset);border:1px solid var(--line);border-radius:8px;
+    color:var(--text-hi);cursor:pointer;font-size:13px;
+    transition:.15s;
+  }
+  .tbtn:hover{border-color:var(--accent);color:var(--accent);}
+  .tbtn:disabled{opacity:.35;cursor:not-allowed;}
+  .tbtn:disabled:hover{border-color:var(--line);color:var(--text-hi);}
+  #playBtn.playing{color:var(--void);background:var(--accent);border-color:var(--accent);}
+
+  input[type=range]{
+    flex:1;-webkit-appearance:none;height:26px;background:transparent;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--line);border-radius:2px;}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);border:2px solid #05100d;margin-top:-5px;
+    box-shadow:0 0 0 3px rgba(63,224,197,.2);
+  }
+  input[type=range]::-moz-range-track{height:4px;background:var(--line);border-radius:2px;}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid #05100d;}
+
+  .timeline-label{font-family:var(--font-mono);font-size:11.5px;color:var(--text-mid);flex:none;min-width:72px;text-align:right;}
+  .truncated-badge{
+    font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--warn);
+    background:var(--warn-dim);border:1px solid rgba(240,169,59,.4);
+    padding:5px 9px;border-radius:6px;flex:none;white-space:nowrap;
+  }
+
+  @media (max-width:980px){
+    .workbench{grid-template-columns:1fr;grid-auto-rows:min-content;overflow-y:auto;}
+    .panel{min-height:340px;}
+    .stage{overflow:auto;}
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">AIR</span>
+      <div class="brand-text">
+        <h1>Algorithm Intermediate Representation</h1>
+        <p>type code, any language → watch the data structures move</p>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="lang-chips" id="langChips"></div>
+      <select id="exampleSelect"></select>
+      <button class="mode-toggle" id="modeToggle" data-mode="live"><span class="dot"></span><span id="modeLabel">LIVE</span></button>
+    </div>
+  </header>
+
+  <main class="workbench">
+    <section class="panel panel-source">
+      <div class="panel-head"><span class="tick tl"></span><span class="tick tr"></span><h2>SOURCE</h2><span class="panel-sub" id="srcLangLabel">javascript</span></div>
+      <div class="editor-wrap" id="editorWrap">
+        <div class="gutter" id="gutter"></div>
+        <div class="code-area" id="codeArea">
+          <div class="current-line-marker hidden-marker" id="lineMarker"></div>
+          <pre class="highlight-layer" id="highlightLayer"></pre>
+          <textarea id="codeInput" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel panel-air">
+      <div class="panel-head"><span class="tick tl"></span><span class="tick tr"></span><h2>AIR STREAM</h2><span class="panel-sub" id="airCountLabel">0 events</span></div>
+      <div class="air-list" id="airList"><div class="air-empty">AIR events generated from your code<br/>will appear here, in order.</div></div>
+    </section>
+
+    <section class="panel panel-viz">
+      <div class="panel-head"><span class="tick tl"></span><span class="tick tr"></span><h2>VISUALIZATION</h2><span class="panel-sub" id="stepLabel">step 0 / 0</span></div>
+      <div class="viz-body" id="vizBody">
+        <div class="viz-empty" id="vizEmpty">
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none"><rect x="4" y="4" width="44" height="44" rx="10" stroke="#2c3947" stroke-width="1.5" stroke-dasharray="4 4"/><path d="M17 26h18M26 17v18" stroke="#2c3947" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <div class="viz-empty-msg">Nothing to visualize yet.<br/>Start typing on the left, or load an example above.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="timeline">
+    <button class="tbtn" id="stepBackBtn" title="Step back">⟵</button>
+    <button class="tbtn" id="playBtn" title="Play">▶</button>
+    <button class="tbtn" id="stepFwdBtn" title="Step forward">⟶</button>
+    <input type="range" id="timelineSlider" min="0" max="0" value="0"/>
+    <span class="timeline-label" id="timelineLabel">0 / 0</span>
+    <span class="truncated-badge" id="truncatedBadge" hidden>⚠ execution capped — possible infinite loop</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================================
+   ENGINE — language-agnostic semantic layer
+   Source → block tree → AIR events → virtual execution → state history
+   ========================================================================= */
+
+function normalizeExpr(raw){
+  let s = raw.trim();
+  s = s.replace(/;$/, '');
+  s = s.replace(/\bNone\b|\bnullptr\b/g, 'null');
+  s = s.replace(/\bTrue\b/g,'true').replace(/\bFalse\b/g,'false');
+  s = s.replace(/\band\b/g,'&&').replace(/\bor\b/g,'||').replace(/\bnot\s+/g,'!');
+  s = s.replace(/(\w+)\.size\(\)/g,'$1.length');
+  s = s.replace(/(\w+)\.length\(\)/g,'$1.length');
+  s = s.replace(/\blen\(([^()]+)\)/g,'($1).length');
+  s = s.replace(/std::max/g,'Math.max').replace(/std::min/g,'Math.min');
+  s = s.replace(/\bmax\(/g,'Math.max(').replace(/\bmin\(/g,'Math.min(');
+  s = s.replace(/\babs\(/g,'Math.abs(');
+  s = s.replace(/\/\//g,'\u00A7FD\u00A7');
+  return s;
+}
+function evalExpr(raw, scope){
+  try{
+    let norm = normalizeExpr(raw);
+    if (norm.indexOf('\u00A7FD\u00A7') !== -1){
+      norm = norm.replace(/([\w.\[\]]+)\s*\u00A7FD\u00A7\s*([\w.\[\]]+)/g, 'Math.floor(($1)/($2))');
+    }
+    const keys = Object.keys(scope);
+    const vals = keys.map(k=>scope[k]);
+    const fn = new Function(...keys, '"use strict"; return (' + norm + ');');
+    return { value: fn(...vals), error: null };
+  }catch(e){
+    return { value: undefined, error: e.message };
+  }
+}
+
+function stripComments(line){
+  let s = line.replace(/\/\/.*$/, '');
+  const hashIdx = s.indexOf('#');
+  if (hashIdx !== -1) s = s.slice(0, hashIdx);
+  return s;
+}
+function toRawLines(code){
+  return code.split('\n').map((text, i)=>{
+    let hint = null;
+    if (/[#/]{1,2}\s*stack\b/i.test(text)) hint = 'stack';
+    else if (/[#/]{1,2}\s*queue\b/i.test(text)) hint = 'queue';
+    const stripped = stripComments(text);
+    const indent = (stripped.match(/^[ \t]*/)[0] || '').replace(/\t/g,'  ').length;
+    return { text: stripped, indent, lineNo:i, hint };
+  });
+}
+
+function parseProgram(rawLines){
+  let idx = 0;
+  function parseBlock(minIndent, closeOnBrace){
+    const stmts = [];
+    while(idx < rawLines.length){
+      const { text, indent, lineNo } = rawLines[idx];
+      const trimmed = text.trim();
+      if (trimmed === ''){ idx++; continue; }
+      if (trimmed === '}'){ idx++; if(closeOnBrace) return stmts; continue; }
+      if (!closeOnBrace && indent < minIndent) return stmts;
+      let opensBrace = trimmed.endsWith('{');
+      let opensColon = !opensBrace && trimmed.endsWith(':');
+      let header = trimmed;
+      if (opensBrace) header = trimmed.slice(0,-1).trim();
+      else if (opensColon) header = trimmed.slice(0,-1).trim();
+      const stmt = { raw: header, lineNo, indent, hint: rawLines[idx].hint, children: [] };
+      idx++;
+      if (opensBrace){
+        stmt.children = parseBlock(0, true);
+      } else if (opensColon){
+        let j = idx;
+        while(j < rawLines.length && rawLines[j].text.trim() === '') j++;
+        if (j < rawLines.length && rawLines[j].indent > indent){
+          stmt.children = parseBlock(indent+1, false);
+        }
+      }
+      stmts.push(stmt);
+    }
+    return stmts;
+  }
+  return parseBlock(0, false);
+}
+
+function matchBalancedCall(s, prefix){
+  const start = prefix.length;
+  if (!s.startsWith(prefix + '(')) return null;
+  let depth = 0;
+  for(let i=start;i<s.length;i++){
+    if (s[i] === '(') depth++;
+    else if (s[i] === ')'){
+      depth--;
+      if (depth === 0){
+        const inner = s.slice(start+1, i);
+        const rest = s.slice(i+1).trim();
+        if (rest !== '') return null;
+        return inner;
+      }
+    }
+  }
+  return null;
+}
+function splitTopLevel(s){
+  const parts = []; let depth=0, cur='';
+  for (const ch of s){
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ',' && depth === 0){ parts.push(cur.trim()); cur=''; }
+    else cur += ch;
+  }
+  if (cur.trim() !== '') parts.push(cur.trim());
+  return parts;
+}
+
+function parseForHeader(header){
+  let m = header.match(/^for\s*\(\s*(?:int|long|auto|let|var)?\s*(\w+)\s*=\s*([^;]+);\s*([^;]+);\s*(.+)\)$/);
+  if (m) return { kind:'c-style', varName:m[1], initExpr:m[2].trim(), condExpr:m[3].trim(), updateExpr:m[4].trim() };
+  m = header.match(/^for\s*\(\s*(?:int|auto|auto&|const\s+auto&|let|var)?\s*&?\s*(\w+)\s*:\s*(\w+)\s*\)$/);
+  if (m) return { kind:'foreach', varName:m[1], iterable:m[2] };
+  m = header.match(/^for\s+(\w+)\s+in\s+(range\(.*\))$/);
+  if (m){
+    const inner = matchBalancedCall(m[2], 'range');
+    if (inner !== null){
+      const parts = splitTopLevel(inner);
+      let startExpr='0', endExpr, stepExpr='1';
+      if (parts.length===1) endExpr=parts[0];
+      else if (parts.length===2){ startExpr=parts[0]; endExpr=parts[1]; }
+      else { startExpr=parts[0]; endExpr=parts[1]; stepExpr=parts[2]; }
+      return { kind:'py-range', varName:m[1], startExpr, endExpr, stepExpr };
+    }
+  }
+  m = header.match(/^for\s+(\w+)\s+in\s+(\w+)$/);
+  if (m) return { kind:'foreach', varName:m[1], iterable:m[2] };
+  if (header.startsWith('while')){
+    m = header.match(/^while\s*\(?(.+?)\)?$/);
+    if (m) return { kind:'while', condExpr:m[1].replace(/\)$/,'').trim() };
+  }
+  return null;
+}
+
+const CONTAINER_DECL = [
+  { re:/\b(?:stack)\s*<[^>]*>\s*(\w+)/i, type:'stack' },
+  { re:/\bStack\s*<[^>]*>\s*(\w+)\s*=\s*new\b/i, type:'stack' },
+  { re:/\b(?:queue|deque)\s*<[^>]*>\s*(\w+)/i, type:'queue' },
+  { re:/\b(?:Queue|Deque|ArrayDeque)\s*<[^>]*>\s*(\w+)\s*=\s*new/i, type:'queue' },
+];
+
+function classifyLine(raw, declaredTypes, hint){
+  const line = raw.trim();
+  if (line === '') return { type:'EMPTY' };
+
+  // CONTAINER DECLARATION (empty or with values)
+  for (const c of CONTAINER_DECL){
+    const m = line.match(c.re);
+    if (m) return { type: c.type==='stack' ? 'STACK_CREATE' : 'QUEUE_CREATE', name:m[1] };
+  }
+
+  // ARRAY/VECTOR INITIALIZATION with values
+  // Handles: vector<int> arr = {1,2,3} OR arr = {1,2,3} OR int[] arr = {1,2,3}
+  let m = line.match(/(?:(?:std::)?vector|deque|array|list|int|char|long|float|double)\s*(?:<[^>]*>)?\s*(\w+)(?:\[\])?\s*=\s*[\{\[]([^\}\]]*)[\}\]]\s*;?\s*$/) ||
+           line.match(/(\w+)(?:\[\])?\s*=\s*[\{\[]([^\}\]]*)[\}\]]\s*;?\s*$/);
+  if (m && !/^(if|while|for)\b/.test(line)){
+    const name = m[1];
+    const valuesRaw = m[2].trim();
+    const values = valuesRaw === '' ? [] : splitTopLevel(valuesRaw);
+    if (hint === 'stack') return { type:'STACK_CREATE', name, valuesRaw: values };
+    if (hint === 'queue') return { type:'QUEUE_CREATE', name, valuesRaw: values };
+    return { type:'ARRAY_CREATE', name, valuesRaw: values };
+  }
+
+  // STRING INITIALIZATION: string s = "..."; (treat as variable)
+  m = line.match(/^(?:std::)?string\s+(\w+)\s*=\s*"([^"]*)"\s*;?\s*$/);
+  if (m) return { type:'VAR_ASSIGN', name:m[1], expr:`"${m[2]}"` };
+  
+  // VECTOR/ARRAY/DEQUE DECLARATION (empty, no values): vector<int> arr; or int[] arr;
+  m = line.match(/^(?:std::)?(?:vector|deque|array|list|stack|queue)\s*<[^>]*>\s+(\w+)\s*;?\s*$/) ||
+      line.match(/^(?:int|char|long|float|double|bool|String)\[\]\s+(\w+)\s*;?\s*$/) ||
+      line.match(/^(?:vector|deque|array|list)\s*<[^>]*>\s+(\w+)\s*;?\s*$/);
+  if (m){
+    const name = m[1];
+    if (hint === 'stack' || line.includes('stack')) return { type:'STACK_CREATE', name, valuesRaw:[] };
+    if (hint === 'queue' || line.includes('queue')) return { type:'QUEUE_CREATE', name, valuesRaw:[] };
+    return { type:'ARRAY_CREATE', name, valuesRaw:[] };
+  }
+
+  m = line.match(/^(\w+)\[([^\]]+)\]\s*=\s*(.+?);?$/);
+  if (m) return { type:'ARRAY_SET', name:m[1], indexExpr:m[2], valueExpr:m[3] };
+
+  m = line.match(/^(\w+)\.(push_back|append|push|add|offer|addLast|enqueue)\((.*)\)\s*;?$/);
+  if (m){
+    const declType = declaredTypes[m[1]];
+    const opType = declType==='stack' ? 'STACK_PUSH' : declType==='queue' ? 'QUEUE_ENQUEUE' : 'ARRAY_PUSH';
+    return { type:opType, name:m[1], valueExpr:m[3] };
+  }
+
+  m = line.match(/^(\w+)\.(pop_back|pop|poll|pollFirst|removeFirst|dequeue|popleft|shift)\(\s*\)\s*;?$/);
+  if (m){
+    const method = m[2];
+    const declType = declaredTypes[m[1]];
+    const isFront = /poll|First|dequeue|popleft|shift/i.test(method);
+    let opType;
+    if (declType==='queue' || isFront) opType='QUEUE_DEQUEUE';
+    else if (declType==='stack') opType='STACK_POP';
+    else opType='ARRAY_POP';
+    return { type:opType, name:m[1] };
+  }
+
+  m = line.match(/^(?:std::)?swap\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*;?$/);
+  if (m) return { type:'SWAP', aExpr:m[1], bExpr:m[2] };
+
+  m = line.match(/^(?:sort\(\s*(\w+)\.begin\(\).*?\)|(\w+)\.sort\(\)|Arrays\.sort\((\w+)\)|(\w+)\s*=\s*sorted\((\w+)\))\s*;?$/);
+  if (m){ const name=m[1]||m[2]||m[3]||m[5]; return { type:'SORT', name }; }
+
+  m = line.match(/^(?:reverse\(\s*(\w+)\.begin\(\).*?\)|(\w+)\.reverse\(\)|Collections\.reverse\((\w+)\))\s*;?$/);
+  if (m){ const name=m[1]||m[2]||m[3]; return { type:'REVERSE', name }; }
+
+  m = line.match(/^(?:console\.log|print|cout\s*<<|System\.out\.println)\(?\s*(.+?)\)?\s*;?$/);
+  if (m && /^(console\.log|print|cout|System\.out\.println)/.test(line)){
+    return { type:'PRINT', expr:m[1].replace(/<<\s*/g,'').trim() };
+  }
+
+  m = line.match(/^(\w+)\s*\+\+\s*;?$/) || line.match(/^\+\+\s*(\w+)\s*;?$/);
+  if (m) return { type:'VAR_UPDATE', name:m[1], deltaExpr:'1' };
+  m = line.match(/^(\w+)\s*--\s*;?$/) || line.match(/^--\s*(\w+)\s*;?$/);
+  if (m) return { type:'VAR_UPDATE', name:m[1], deltaExpr:'-1' };
+
+  m = line.match(/^(\w+)\s*(\+=|-=|\*=|\/=)\s*(.+?);?$/);
+  if (m) return { type:'VAR_COMPOUND', name:m[1], op:m[2], expr:m[3] };
+
+  // GENERAL VARIABLE ASSIGNMENT (handles quoted strings, expressions, etc)
+  m = line.match(/^(?:int|long|float|double|char|bool|boolean|var|let|const|auto|String|str)?\s*(\w+)\s*=(?!=)\s*(.+?);?\s*$/);
+  if (m) {
+    let expr = m[2].trim();
+    // if it's a quoted string, keep the quotes
+    if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
+      return { type:'VAR_ASSIGN', name:m[1], expr };
+    }
+    return { type:'VAR_ASSIGN', name:m[1], expr };
+  }
+
+  m = line.match(/^return\b(.*)$/);
+  if (m) return { type:'RETURN', expr:m[1].trim() };
+
+  return { type:'UNKNOWN', raw: line };
+}
+
+const MAX_STEPS = 400;
+const MAX_LOOP_ITERS = 200;
+
+function cloneState(state){
+  return {
+    vars: { ...state.vars },
+    containers: Object.fromEntries(Object.entries(state.containers).map(([k,v])=>[k,{type:v.type, values:[...v.values], ids:[...v.ids]}]))
+  };
+}
+function scopeOf(state){
+  const scope = { ...state.vars };
+  for (const [name,c] of Object.entries(state.containers)) scope[name] = c.values;
+  return scope;
+}
+
+function runProgram(tree){
+  const state = { vars:{}, containers:{} };
+  const declaredTypes = {};
+  const history = [];
+  let stepCount = 0, truncated = false, nextId = 1;
+  const genId = ()=> nextId++;
+
+  function pushHistory(lineNo, air, note, warning){
+    history.push({ lineNo, air, note, state: cloneState(state), warning: warning || null });
+  }
+
+  function execStatement(stmt){
+    if (stepCount >= MAX_STEPS){ truncated = true; return; }
+    stepCount++;
+    const air = classifyLine(stmt.raw, declaredTypes, stmt.hint);
+    const scope = scopeOf(state);
+
+    switch(air.type){
+      case 'ARRAY_CREATE': {
+        const values = air.valuesRaw.map(v=>evalExpr(v,scope).value);
+        state.containers[air.name] = { type:'array', values, ids: values.map(()=>genId()) };
+        declaredTypes[air.name] = 'array';
+        pushHistory(stmt.lineNo, air, `Create array ${air.name} = [${values.join(', ')}]`);
+        break;
+      }
+      case 'STACK_CREATE': {
+        const values = (air.valuesRaw||[]).map(v=>evalExpr(v,scope).value);
+        state.containers[air.name] = { type:'stack', values, ids: values.map(()=>genId()) };
+        declaredTypes[air.name] = 'stack';
+        pushHistory(stmt.lineNo, air, values.length ? `Create stack ${air.name} = [${values.join(', ')}]` : `Create empty stack ${air.name}`);
+        break;
+      }
+      case 'QUEUE_CREATE': {
+        const values = (air.valuesRaw||[]).map(v=>evalExpr(v,scope).value);
+        state.containers[air.name] = { type:'queue', values, ids: values.map(()=>genId()) };
+        declaredTypes[air.name] = 'queue';
+        pushHistory(stmt.lineNo, air, values.length ? `Create queue ${air.name} = [${values.join(', ')}]` : `Create empty queue ${air.name}`);
+        break;
+      }
+      case 'ARRAY_PUSH': case 'STACK_PUSH': {
+        const val = evalExpr(air.valueExpr, scope).value;
+        if (!state.containers[air.name]) state.containers[air.name] = { type: air.type==='STACK_PUSH'?'stack':'array', values:[], ids:[] };
+        state.containers[air.name].values.push(val);
+        state.containers[air.name].ids.push(genId());
+        pushHistory(stmt.lineNo, air, `Push ${val} onto ${air.name}`);
+        break;
+      }
+      case 'QUEUE_ENQUEUE': {
+        const val = evalExpr(air.valueExpr, scope).value;
+        if (!state.containers[air.name]) state.containers[air.name] = { type:'queue', values:[], ids:[] };
+        state.containers[air.name].values.push(val);
+        state.containers[air.name].ids.push(genId());
+        pushHistory(stmt.lineNo, air, `Enqueue ${val} into ${air.name}`);
+        break;
+      }
+      case 'ARRAY_POP': case 'STACK_POP': {
+        const c = state.containers[air.name];
+        const val = c ? c.values.pop() : undefined;
+        if (c) c.ids.pop();
+        pushHistory(stmt.lineNo, air, `Pop ${val} from ${air.name}`);
+        break;
+      }
+      case 'QUEUE_DEQUEUE': {
+        const c = state.containers[air.name];
+        const val = c ? c.values.shift() : undefined;
+        if (c) c.ids.shift();
+        pushHistory(stmt.lineNo, air, `Dequeue ${val} from ${air.name}`);
+        break;
+      }
+      case 'ARRAY_SET': {
+        const idx = evalExpr(air.indexExpr, scope).value;
+        const val = evalExpr(air.valueExpr, scope).value;
+        const c = state.containers[air.name];
+        if (c){ c.values[idx] = val; if (c.ids[idx]===undefined) c.ids[idx]=genId(); }
+        pushHistory(stmt.lineNo, air, `Set ${air.name}[${idx}] = ${val}`);
+        break;
+      }
+      case 'SWAP': {
+        const ai = air.aExpr.match(/^(\w+)\[(.+)\]$/);
+        const bi = air.bExpr.match(/^(\w+)\[(.+)\]$/);
+        if (ai && bi && ai[1]===bi[1] && state.containers[ai[1]]){
+          const c = state.containers[ai[1]];
+          const i1 = evalExpr(ai[2],scope).value, i2 = evalExpr(bi[2],scope).value;
+          [c.values[i1], c.values[i2]] = [c.values[i2], c.values[i1]];
+          [c.ids[i1], c.ids[i2]] = [c.ids[i2], c.ids[i1]];
+        }
+        pushHistory(stmt.lineNo, air, `Swap ${air.aExpr} and ${air.bExpr}`);
+        break;
+      }
+      case 'SORT': {
+        const c = state.containers[air.name];
+        if (c){
+          const paired = c.values.map((v,i)=>[v,c.ids[i]]);
+          paired.sort((a,b)=> a[0]<b[0]?-1:a[0]>b[0]?1:0);
+          c.values = paired.map(p=>p[0]);
+          c.ids = paired.map(p=>p[1]);
+        }
+        pushHistory(stmt.lineNo, air, `Sort ${air.name}`);
+        break;
+      }
+      case 'REVERSE': {
+        const c = state.containers[air.name];
+        if (c){ c.values.reverse(); c.ids.reverse(); }
+        pushHistory(stmt.lineNo, air, `Reverse ${air.name}`);
+        break;
+      }
+      case 'VAR_ASSIGN': {
+        const val = evalExpr(air.expr, scope).value;
+        state.vars[air.name] = val;
+        pushHistory(stmt.lineNo, air, `${air.name} = ${fmtVal(val)}`);
+        break;
+      }
+      case 'VAR_UPDATE': {
+        const delta = evalExpr(air.deltaExpr, scope).value;
+        state.vars[air.name] = (state.vars[air.name]||0) + delta;
+        pushHistory(stmt.lineNo, air, `${air.name} ${delta>0?'+':''}${delta} \u2192 ${state.vars[air.name]}`);
+        break;
+      }
+      case 'VAR_COMPOUND': {
+        const rhs = evalExpr(air.expr, scope).value;
+        const cur = state.vars[air.name] || 0;
+        let next;
+        if (air.op==='+=') next=cur+rhs; else if (air.op==='-=') next=cur-rhs;
+        else if (air.op==='*=') next=cur*rhs; else next=cur/rhs;
+        state.vars[air.name] = next;
+        pushHistory(stmt.lineNo, air, `${air.name} ${air.op} ${fmtVal(rhs)} \u2192 ${fmtVal(next)}`);
+        break;
+      }
+      case 'PRINT': {
+        const val = evalExpr(air.expr, scope).value;
+        pushHistory(stmt.lineNo, air, `print: ${fmtVal(val)}`);
+        break;
+      }
+      case 'RETURN': {
+        pushHistory(stmt.lineNo, air, `return ${air.expr}`);
+        break;
+      }
+      case 'UNKNOWN': {
+        pushHistory(stmt.lineNo, air, `Not recognized — shown as-is, no state change`);
+        break;
+      }
+      default:
+        pushHistory(stmt.lineNo, air, air.type);
+    }
+  }
+
+  function execBlock(stmts){
+    for (const stmt of stmts){
+      if (stepCount >= MAX_STEPS){ truncated = true; return; }
+      const h = stmt.raw;
+      if (/^for\s*\(|^for\s+\w+\s+in\s+/.test(h)) execFor(stmt);
+      else if (/^while\s*\(?/.test(h)) execFor(stmt);
+      else if (/^if\s*\(?/.test(h)) execIf(stmt);
+      else execStatement(stmt);
+    }
+  }
+
+  function runUpdateExpr(updateExpr, scope2){
+    const updClassified = classifyLine(updateExpr + ';', declaredTypes);
+    if (updClassified.type === 'VAR_UPDATE'){
+      state.vars[updClassified.name] = (state.vars[updClassified.name]||0) + evalExpr(updClassified.deltaExpr, scope2).value;
+    } else if (updClassified.type === 'VAR_COMPOUND'){
+      const rhs = evalExpr(updClassified.expr, scope2).value;
+      const cur = state.vars[updClassified.name] || 0;
+      state.vars[updClassified.name] = updClassified.op==='+=' ? cur+rhs : updClassified.op==='-=' ? cur-rhs : updClassified.op==='*=' ? cur*rhs : cur/rhs;
+    }
+  }
+
+  function execFor(stmt){
+    const header = parseForHeader(stmt.raw);
+    stepCount++;
+    if (!header){
+      pushHistory(stmt.lineNo, { type:'UNKNOWN', raw:stmt.raw }, 'Unrecognized loop header — shown as-is');
+      return;
+    }
+    const scope0 = scopeOf(state);
+    let iters = 0;
+
+    if (header.kind === 'c-style'){
+      state.vars[header.varName] = evalExpr(header.initExpr, scope0).value;
+      pushHistory(stmt.lineNo, { type:'LOOP_START', var:header.varName, value: state.vars[header.varName] }, `Loop start: ${header.varName} = ${state.vars[header.varName]}`);
+      let stoppedByCap = false;
+      while (iters < MAX_LOOP_ITERS && stepCount < MAX_STEPS){
+        const scope = scopeOf(state);
+        if (!evalExpr(header.condExpr, scope).value) break;
+        execBlock(stmt.children);
+        const scope2 = scopeOf(state);
+        runUpdateExpr(header.updateExpr, scope2);
+        iters++; stepCount++;
+        const nowVal = state.vars[header.varName];
+        pushHistory(stmt.lineNo, { type:'LOOP_ITER', var:header.varName, value: nowVal }, `${header.varName} \u2192 ${fmtVal(nowVal)}`);
+        if (iters >= MAX_LOOP_ITERS || stepCount >= MAX_STEPS){ stoppedByCap = true; break; }
+      }
+      if (stoppedByCap){
+        const stillTrue = !!evalExpr(header.condExpr, scopeOf(state)).value;
+        if (stillTrue){
+          pushHistory(stmt.lineNo, { type:'LOOP_ANOMALY', var:header.varName, reason:'runaway' },
+            `Loop counter '${header.varName}' never satisfied '${header.condExpr}' after ${iters} iterations.`,
+            { kind:'anomaly', message: `Possible infinite loop: '${header.updateExpr}' moves '${header.varName}' away from satisfying '${header.condExpr}'.` });
+          truncated = true;
+        }
+      }
+      pushHistory(stmt.lineNo, { type:'LOOP_END', var:header.varName }, `Loop end (${iters} iterations)`);
+
+    } else if (header.kind === 'py-range'){
+      const start = evalExpr(header.startExpr, scope0).value;
+      const end = evalExpr(header.endExpr, scope0).value;
+      const step = evalExpr(header.stepExpr, scope0).value;
+      pushHistory(stmt.lineNo, { type:'LOOP_START', var:header.varName }, `Loop start: range(${start}, ${end}, ${step})`);
+      let i = start;
+      const goingUp = step > 0;
+      if (step === 0){
+        pushHistory(stmt.lineNo, { type:'LOOP_ANOMALY', var:header.varName, reason:'zero-step' }, `range() step is 0 — loop never advances.`,
+          { kind:'anomaly', message:`range() step is 0: this loop would never terminate.` });
+        truncated = true;
+      } else {
+        while ((goingUp ? i < end : i > end) && iters < MAX_LOOP_ITERS && stepCount < MAX_STEPS){
+          state.vars[header.varName] = i;
+          execBlock(stmt.children);
+          pushHistory(stmt.lineNo, { type:'LOOP_ITER', var:header.varName, value:i }, `${header.varName} \u2192 ${fmtVal(i)}`);
+          i += step; iters++; stepCount++;
+        }
+      }
+      pushHistory(stmt.lineNo, { type:'LOOP_END', var:header.varName }, `Loop end (${iters} iterations)`);
+
+    } else if (header.kind === 'foreach'){
+      const arr = state.containers[header.iterable] ? state.containers[header.iterable].values : [];
+      pushHistory(stmt.lineNo, { type:'LOOP_START', var:header.varName }, `Loop start: for each in ${header.iterable}`);
+      for (const v of arr){
+        if (stepCount >= MAX_STEPS){ truncated = true; break; }
+        state.vars[header.varName] = v;
+        execBlock(stmt.children);
+        pushHistory(stmt.lineNo, { type:'LOOP_ITER', var:header.varName, value:v }, `${header.varName} \u2192 ${fmtVal(v)}`);
+        iters++; stepCount++;
+      }
+      pushHistory(stmt.lineNo, { type:'LOOP_END', var:header.varName }, `Loop end (${iters} iterations)`);
+
+    } else if (header.kind === 'while'){
+      pushHistory(stmt.lineNo, { type:'LOOP_START' }, `While loop start`);
+      let stoppedByCap = false;
+      while (iters < MAX_LOOP_ITERS && stepCount < MAX_STEPS){
+        const scope = scopeOf(state);
+        if (!evalExpr(header.condExpr, scope).value) break;
+        execBlock(stmt.children);
+        iters++; stepCount++;
+        if (iters >= MAX_LOOP_ITERS || stepCount >= MAX_STEPS){ stoppedByCap = true; break; }
+      }
+      if (stoppedByCap){
+        const stillTrue = !!evalExpr(header.condExpr, scopeOf(state)).value;
+        if (stillTrue){
+          pushHistory(stmt.lineNo, { type:'LOOP_ANOMALY', reason:'runaway' }, `While condition '${header.condExpr}' still true after ${iters} iterations.`,
+            { kind:'anomaly', message:`Possible infinite while loop: '${header.condExpr}' never becomes false.` });
+          truncated = true;
+        }
+      }
+      pushHistory(stmt.lineNo, { type:'LOOP_END' }, `Loop end (${iters} iterations)`);
+    }
+  }
+
+  function execIf(stmt){
+    stepCount++;
+    const m = stmt.raw.match(/^if\s*\(?(.+?)\)?$/);
+    const condExpr = m ? m[1].replace(/\)$/,'') : 'false';
+    const result = !!evalExpr(condExpr, scopeOf(state)).value;
+    pushHistory(stmt.lineNo, { type:'IF', condition:condExpr, result }, `if (${condExpr}) \u2192 ${result}`);
+    if (result) execBlock(stmt.children);
+  }
+
+  execBlock(tree);
+  return { history, truncated };
+}
+
+function fmtVal(v){
+  if (v === undefined) return '?';
+  if (Array.isArray(v)) return '[' + v.join(', ') + ']';
+  try { return String(v); } catch(e){ return '?'; }
+}
+
+/* =========================================================================
+   EXAMPLE SNIPPETS
+   ========================================================================= */
+const EXAMPLES = {
+  bubbleSort: {
+    label: 'Bubble Sort',
+    code: {
+      cpp: `vector<int> arr = {5,3,4,1,2};
+for(int i=0;i<arr.size();i++){
+  for(int j=0;j<arr.size()-i-1;j++){
+    if(arr[j]>arr[j+1]){
+      swap(arr[j], arr[j+1]);
+    }
+  }
+}`,
+      python: `arr = [5,3,4,1,2]
+for i in range(len(arr)):
+    for j in range(len(arr)-i-1):
+        if arr[j] > arr[j+1]:
+            swap(arr[j], arr[j+1])`,
+      java: `int[] arr = {5,3,4,1,2};
+for(int i=0;i<arr.length;i++){
+  for(int j=0;j<arr.length-i-1;j++){
+    if(arr[j]>arr[j+1]){
+      swap(arr[j], arr[j+1]);
+    }
+  }
+}`,
+      javascript: `let arr = [5,3,4,1,2];
+for(let i=0;i<arr.length;i++){
+  for(let j=0;j<arr.length-i-1;j++){
+    if(arr[j]>arr[j+1]){
+      swap(arr[j], arr[j+1]);
+    }
+  }
+}`
+    }
+  },
+  twoPointer: {
+    label: 'Two-Pointer Reverse',
+    code: {
+      cpp: `vector<int> arr = {1,2,3,4,5,6};
+int l = 0;
+int r = arr.size()-1;
+while(l<r){
+  swap(arr[l], arr[r]);
+  l++;
+  r--;
+}`,
+      python: `arr = [1,2,3,4,5,6]
+l = 0
+r = len(arr)-1
+while l<r:
+    swap(arr[l], arr[r])
+    l += 1
+    r -= 1`,
+      java: `int[] arr = {1,2,3,4,5,6};
+int l = 0;
+int r = arr.length-1;
+while(l<r){
+  swap(arr[l], arr[r]);
+  l++;
+  r--;
+}`,
+      javascript: `let arr = [1,2,3,4,5,6];
+let l = 0;
+let r = arr.length-1;
+while(l<r){
+  swap(arr[l], arr[r]);
+  l++;
+  r--;
+}`
+    }
+  },
+  stackDemo: {
+    label: 'Stack Push/Pop',
+    code: {
+      cpp: `stack<int> st;
+st.push(5);
+st.push(2);
+st.push(9);
+st.pop();
+st.push(7);`,
+      python: `st = []  # stack
+st.append(5)
+st.append(2)
+st.append(9)
+st.pop()
+st.append(7)`,
+      java: `Stack<Integer> st = new Stack<>();
+st.push(5);
+st.push(2);
+st.push(9);
+st.pop();
+st.push(7);`,
+      javascript: `let st = []; // stack
+st.push(5);
+st.push(2);
+st.push(9);
+st.pop();
+st.push(7);`
+    }
+  },
+  queueDemo: {
+    label: 'Queue Enqueue/Dequeue',
+    code: {
+      cpp: `queue<int> q;
+q.push(1);
+q.push(2);
+q.push(3);
+q.pop();`,
+      python: `q = []  # queue
+q.append(1)
+q.append(2)
+q.append(3)
+q.popleft()`,
+      java: `Queue<Integer> q = new LinkedList<>();
+q.add(1);
+q.add(2);
+q.add(3);
+q.poll();`,
+      javascript: `let q = []; // queue
+q.push(1);
+q.push(2);
+q.push(3);
+q.shift();`
+    }
+  },
+  anomaly: {
+    label: 'Anomaly: Backward Loop',
+    code: {
+      cpp: `int n = 6;
+for(int i=0;i<n;i--){
+}`,
+      python: `n = 6
+i = 0
+while i < n:
+    i -= 1`,
+      java: `int n = 6;
+for(int i=0;i<n;i--){
+}`,
+      javascript: `let n = 6;
+for(let i=0;i<n;i--){
+}`
+    }
+  },
+  blank: { label: 'Blank — write your own', code: { cpp:'', python:'', java:'', javascript:'' } }
+};
+const LANGS = [
+  {id:'cpp', label:'C++'},
+  {id:'python', label:'Python'},
+  {id:'java', label:'Java'},
+  {id:'javascript', label:'JavaScript'}
+];
+
+/* =========================================================================
+   SYNTAX HIGHLIGHTING (display-only overlay)
+   ========================================================================= */
+const KEYWORDS = /\b(for|while|if|else|return|def|class|public|private|static|new|in|range|True|False|None|true|false|null|nullptr|and|or|not|break|continue|import|from|void)\b/;
+const TYPES = /\b(vector|stack|queue|deque|int|long|float|double|char|bool|boolean|var|let|const|auto|String|str|Integer|Stack|Queue|Deque|ArrayDeque|LinkedList|List|ArrayList)\b/;
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function highlightLine(line){
+  if (line === '') return '\u200b';
+  const commentMatch = line.match(/(\/\/.*$)|(#.*$)/);
+  let code = line, comment = '';
+  if (commentMatch){
+    code = line.slice(0, commentMatch.index);
+    comment = line.slice(commentMatch.index);
+  }
+  const tokenRe = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(\b\d+\.?\d*\b)|(\b\w+\b(?=\s*\())|(\b\w+\b)|([{}()\[\];,.:<>+\-*/%=!&|]+)/g;
+  let out = '';
+  let last = 0;
+  let m;
+  while((m = tokenRe.exec(code)) !== null){
+    out += escapeHtml(code.slice(last, m.index));
+    const str=m[1], num=m[2], fn=m[3], word=m[4], punct=m[5];
+    if (str) out += '<span class="tok-str">' + escapeHtml(str) + '</span>';
+    else if (num) out += '<span class="tok-num">' + escapeHtml(num) + '</span>';
+    else if (fn) out += '<span class="tok-fn">' + escapeHtml(fn) + '</span>';
+    else if (word){
+      if (KEYWORDS.test(word)) out += '<span class="tok-kw">'+escapeHtml(word)+'</span>';
+      else if (TYPES.test(word)) out += '<span class="tok-type">'+escapeHtml(word)+'</span>';
+      else out += escapeHtml(word);
+    }
+    else if (punct) out += '<span class="tok-punct">'+escapeHtml(punct)+'</span>';
+    last = tokenRe.lastIndex;
+  }
+  out += escapeHtml(code.slice(last));
+  if (comment) out += '<span class="tok-com">' + escapeHtml(comment) + '</span>';
+  return out || '\u200b';
+}
+
+/* =========================================================================
+   APP STATE + DOM WIRING
+   ========================================================================= */
+const els = {
+  langChips: document.getElementById('langChips'),
+  exampleSelect: document.getElementById('exampleSelect'),
+  modeToggle: document.getElementById('modeToggle'),
+  modeLabel: document.getElementById('modeLabel'),
+  srcLangLabel: document.getElementById('srcLangLabel'),
+  gutter: document.getElementById('gutter'),
+  codeArea: document.getElementById('codeArea'),
+  lineMarker: document.getElementById('lineMarker'),
+  highlightLayer: document.getElementById('highlightLayer'),
+  codeInput: document.getElementById('codeInput'),
+  editorWrap: document.getElementById('editorWrap'),
+  airList: document.getElementById('airList'),
+  airCountLabel: document.getElementById('airCountLabel'),
+  vizBody: document.getElementById('vizBody'),
+  vizEmpty: document.getElementById('vizEmpty'),
+  stepLabel: document.getElementById('stepLabel'),
+  playBtn: document.getElementById('playBtn'),
+  stepBackBtn: document.getElementById('stepBackBtn'),
+  stepFwdBtn: document.getElementById('stepFwdBtn'),
+  timelineSlider: document.getElementById('timelineSlider'),
+  timelineLabel: document.getElementById('timelineLabel'),
+  truncatedBadge: document.getElementById('truncatedBadge'),
+};
+
+const app = {
+  lang: 'javascript',
+  example: 'bubbleSort',
+  mode: 'live', // 'live' | 'step'
+  history: [],
+  truncated: false,
+  stepIndex: 0,
+  playing: false,
+  playTimer: null,
+  dynamicSections: new Map(), // key -> DOM element, persisted across renders for FLIP
+};
+
+/* ---- language chips ---- */
+LANGS.forEach(l=>{
+  const btn = document.createElement('button');
+  btn.className = 'lang-chip' + (l.id===app.lang ? ' active' : '');
+  btn.textContent = l.label;
+  btn.dataset.lang = l.id;
+  btn.addEventListener('click', ()=>{
+    app.lang = l.id;
+    document.querySelectorAll('.lang-chip').forEach(c=>c.classList.toggle('active', c.dataset.lang===l.id));
+    els.srcLangLabel.textContent = l.id;
+    loadExample(app.example, false);
+  });
+  els.langChips.appendChild(btn);
+});
+
+/* ---- example dropdown ---- */
+Object.entries(EXAMPLES).forEach(([key, ex])=>{
+  const opt = document.createElement('option');
+  opt.value = key; opt.textContent = ex.label;
+  els.exampleSelect.appendChild(opt);
+});
+els.exampleSelect.value = app.example;
+els.exampleSelect.addEventListener('change', ()=>{
+  app.example = els.exampleSelect.value;
+  loadExample(app.example, true);
+});
+
+function loadExample(key, resetCode){
+  const ex = EXAMPLES[key];
+  const code = ex.code[app.lang] !== undefined ? ex.code[app.lang] : '';
+  els.codeInput.value = code;
+  recompute({ jumpToEnd: true });
+  autoresize();
+}
+
+/* ---- mode toggle ---- */
+els.modeToggle.addEventListener('click', ()=>{
+  app.mode = app.mode === 'live' ? 'step' : 'live';
+  els.modeToggle.dataset.mode = app.mode;
+  els.modeLabel.textContent = app.mode.toUpperCase();
+  if (app.mode === 'live') setStep(app.history.length ? app.history.length-1 : 0);
+});
+
+/* ---- editor: gutter, highlight, autosize ---- */
+function autoresize(){
+  els.codeInput.style.height = 'auto';
+  const h = Math.max(els.codeInput.scrollHeight, 46);
+  els.codeInput.style.height = h + 'px';
+  els.codeArea.style.minHeight = h + 'px';
+}
+function renderGutterAndHighlight(){
+  const lines = els.codeInput.value.split('\n');
+  let gutterHtml = '';
+  for (let i=0;i<lines.length;i++){
+    gutterHtml += `<div class="gline" data-line="${i}">${i+1}</div>`;
+  }
+  els.gutter.innerHTML = gutterHtml;
+  els.highlightLayer.innerHTML = lines.map(highlightLine).join('\n');
+}
+els.gutter.addEventListener('click', (e)=>{
+  const g = e.target.closest('.gline');
+  if (!g) return;
+  const lineNo = parseInt(g.dataset.line, 10);
+  let target = -1;
+  for (let i=0;i<app.history.length;i++){ if (app.history[i].lineNo === lineNo) target = i; }
+  if (target >= 0) setStep(target);
+});
+
+let recomputeRAF = null;
+els.codeInput.addEventListener('input', ()=>{
+  autoresize();
+  renderGutterAndHighlight();
+  if (recomputeRAF) cancelAnimationFrame(recomputeRAF);
+  recomputeRAF = requestAnimationFrame(()=>{
+    recompute({ jumpToEnd: app.mode === 'live' });
+  });
+});
+els.codeInput.addEventListener('scroll', ()=>{
+  els.highlightLayer.scrollTop = els.codeInput.scrollTop;
+});
+els.codeInput.addEventListener('keydown', (e)=>{
+  if (e.key === 'Tab'){
+    e.preventDefault();
+    const start = els.codeInput.selectionStart, end = els.codeInput.selectionEnd;
+    const v = els.codeInput.value;
+    els.codeInput.value = v.slice(0,start) + '  ' + v.slice(end);
+    els.codeInput.selectionStart = els.codeInput.selectionEnd = start + 2;
+    els.codeInput.dispatchEvent(new Event('input'));
+  }
+});
+
+/* ---- core recompute pipeline ---- */
+function recompute(opts){
+  opts = opts || {};
+  const code = els.codeInput.value;
+  let history = [], truncated = false;
+  try{
+    const tree = parseProgram(toRawLines(code));
+    const result = runProgram(tree);
+    history = result.history;
+    truncated = result.truncated;
+  }catch(e){
+    history = []; truncated = false;
+  }
+  app.history = history;
+  app.truncated = truncated;
+  els.truncatedBadge.hidden = !truncated;
+
+  const maxIdx = Math.max(0, history.length - 1);
+  els.timelineSlider.max = String(maxIdx);
+  if (opts.jumpToEnd){
+    app.stepIndex = maxIdx;
+  } else {
+    app.stepIndex = Math.min(app.stepIndex, maxIdx);
+  }
+  els.timelineSlider.value = String(app.stepIndex);
+
+  renderAirList();
+  renderStep();
+}
+
+/* ---- AIR list ---- */
+function airCategoryClass(type){
+  if (type.endsWith('_CREATE')) return 'c-create';
+  if (type.endsWith('_PUSH') || type==='QUEUE_ENQUEUE') return 'c-push';
+  if (type.endsWith('_POP') || type==='QUEUE_DEQUEUE') return 'c-pop';
+  if (type.startsWith('VAR_')) return 'c-var';
+  if (type.startsWith('LOOP_') && type!=='LOOP_ANOMALY') return 'c-loop';
+  if (type==='LOOP_ANOMALY') return 'c-anomaly';
+  if (type==='IF') return 'c-cond';
+  if (type==='SWAP'||type==='SORT'||type==='REVERSE') return 'c-op';
+  if (type==='PRINT'||type==='RETURN') return 'c-print';
+  return 'c-unknown';
+}
+function renderAirList(){
+  if (!app.history.length){
+    els.airList.innerHTML = '<div class="air-empty">AIR events generated from your code<br/>will appear here, in order.</div>';
+    els.airCountLabel.textContent = '0 events';
+    return;
+  }
+  els.airCountLabel.textContent = app.history.length + ' event' + (app.history.length===1?'':'s');
+  const frag = document.createDocumentFragment();
+  app.history.forEach((h, i)=>{
+    const t = document.createElement('div');
+    t.className = 'air-ticket' + (i===app.stepIndex?' current':'') + (h.warning?' warning':'');
+    t.dataset.idx = i;
+    const cat = airCategoryClass(h.air.type);
+    t.innerHTML = `<div class="air-ticket-top"><span class="air-type ${cat}">${h.air.type}</span><span class="air-line">L${h.lineNo+1}</span></div><div class="air-note">${escapeHtml(h.note)}</div>`;
+    frag.appendChild(t);
+  });
+  els.airList.innerHTML = '';
+  els.airList.appendChild(frag);
+  els.airList.addEventListener('click', onAirClick);
+}
+function onAirClick(e){
+  const t = e.target.closest('.air-ticket');
+  if (!t) return;
+  setStep(parseInt(t.dataset.idx, 10));
+}
+
+/* ---- keyed diff + FLIP renderer for rows/columns ---- */
+function diffRenderRow(containerEl, items, buildCellFn){
+  const oldEls = new Map();
+  Array.from(containerEl.children).forEach(el=> oldEls.set(el.dataset.key, el));
+  const oldRects = new Map();
+  oldEls.forEach((el,k)=> oldRects.set(k, el.getBoundingClientRect()));
+
+  const usedKeys = new Set();
+  let prevEl = null;
+  items.forEach(item=>{
+    const key = String(item.key);
+    usedKeys.add(key);
+    let el = oldEls.get(key);
+    const isNew = !el;
+    const fresh = buildCellFn(item);
+    fresh.dataset.key = key;
+    if (isNew){
+      el = fresh;
+      if (prevEl) prevEl.after(el); else containerEl.prepend(el);
+      el.classList.add('cell-enter');
+    } else {
+      const wasFlash = el.classList.contains('flash');
+      el.className = fresh.className;
+      el.innerHTML = fresh.innerHTML;
+      if (item.changed) { void el.offsetWidth; el.classList.add('flash'); }
+      if (prevEl){ if (prevEl.nextSibling !== el) prevEl.after(el); }
+      else { if (containerEl.firstChild !== el) containerEl.prepend(el); }
+    }
+    prevEl = el;
+  });
+  oldEls.forEach((el,key)=>{
+    if (!usedKeys.has(key)){
+      el.classList.add('cell-leave');
+      setTimeout(()=>{ if (el.parentNode===containerEl) containerEl.removeChild(el); }, 300);
+    }
+  });
+  usedKeys.forEach(key=>{
+    const el = Array.from(containerEl.children).find(c=>c.dataset.key===key);
+    if (!el) return;
+    const oldRect = oldRects.get(key);
+    if (oldRect){
+      const newRect = el.getBoundingClientRect();
+      const dx = oldRect.left - newRect.left, dy = oldRect.top - newRect.top;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5){
+        el.style.transition = 'none';
+        el.style.transform = `translate(${dx}px,${dy}px)`;
+        requestAnimationFrame(()=>{
+          el.style.transition = 'transform 400ms cubic-bezier(.22,.8,.25,1)';
+          el.style.transform = '';
+        });
+      }
+    }
+  });
+}
+
+/* ---- visualization render ---- */
+function getPrevSnapshot(){
+  return app.stepIndex > 0 ? app.history[app.stepIndex-1].state : null;
+}
+function renderStep(){
+  const total = app.history.length;
+  els.stepLabel.textContent = `step ${total? app.stepIndex+1:0} / ${total}`;
+  els.timelineLabel.textContent = `${total? app.stepIndex+1:0} / ${total}`;
+  els.stepBackBtn.disabled = app.stepIndex <= 0;
+  els.stepFwdBtn.disabled = app.stepIndex >= total-1 || total===0;
+  els.timelineSlider.disabled = total <= 1;
+
+  // gutter active line
+  const cur = total ? app.history[app.stepIndex] : null;
+  document.querySelectorAll('.gutter .gline').forEach(g=> g.classList.remove('active'));
+  if (cur){
+    const g = els.gutter.querySelector(`.gline[data-line="${cur.lineNo}"]`);
+    if (g) g.classList.add('active');
+    els.lineMarker.style.top = `calc(var(--pad-top) + ${cur.lineNo} * var(--line-h))`;
+    els.lineMarker.classList.remove('hidden-marker');
+  } else {
+    els.lineMarker.classList.add('hidden-marker');
+  }
+
+  // refresh AIR ticket highlight without full rebuild (cheap)
+  Array.from(els.airList.children).forEach((t)=>{
+    const i = parseInt(t.dataset.idx, 10);
+    t.classList.toggle('current', i===app.stepIndex);
+  });
+  if (cur){
+    const activeTicket = els.airList.querySelector(`.air-ticket[data-idx="${app.stepIndex}"]`);
+    if (activeTicket) activeTicket.scrollIntoView({ block:'nearest', behavior: app.playing ? 'auto' : 'smooth' });
+  }
+
+  renderVisualization();
+}
+
+function renderVisualization(){
+  const total = app.history.length;
+  els.vizEmpty.style.display = total ? 'none' : 'flex';
+  if (!total){
+    Array.from(els.vizBody.children).forEach(c=>{ if (c!==els.vizEmpty) c.remove(); });
+    app.dynamicSections.clear();
+    return;
+  }
+  const snap = app.history[app.stepIndex].state;
+  const prevSnap = getPrevSnapshot();
+  const prevIds = {};
+  if (prevSnap){
+    Object.entries(prevSnap.containers).forEach(([name,c])=>{
+      const m = {};
+      c.ids.forEach((id,i)=> m[id]=c.values[i]);
+      prevIds[name] = m;
+    });
+  }
+
+  ensureSection('anomaly');
+  const anomalyEl = app.dynamicSections.get('anomaly');
+  const curWarning = app.history[app.stepIndex].warning;
+  const anyWarningUpTo = app.history.slice(0, app.stepIndex+1).some(h=>h.warning);
+  if (curWarning || (app.truncated && anyWarningUpTo)){
+    const w = curWarning || app.history.slice(0,app.stepIndex+1).reverse().find(h=>h.warning).warning;
+    anomalyEl.hidden = false;
+    anomalyEl.innerHTML = `<span class="ic">\u26A0</span><div class="msg"><b>Logical anomaly detected.</b> ${escapeHtml(w.message)}</div>`;
+  } else {
+    anomalyEl.hidden = true;
+  }
+
+  // containers
+  const containerNames = Object.keys(snap.containers);
+  ensureSection('containers-wrap');
+  const wrap = app.dynamicSections.get('containers-wrap');
+  const prevKeys = new Set(Array.from(wrap.children).map(c=>c.dataset.containerName));
+  const curKeysSet = new Set(containerNames);
+  prevKeys.forEach(name=>{
+    if (!curKeysSet.has(name)){
+      const el = wrap.querySelector(`[data-container-name="${cssEscape(name)}"]`);
+      if (el) el.remove();
+    }
+  });
+  containerNames.forEach(name=>{
+    const c = snap.containers[name];
+    let sec = wrap.querySelector(`[data-container-name="${cssEscape(name)}"]`);
+    if (!sec){
+      sec = document.createElement('div');
+      sec.className = 'viz-section';
+      sec.dataset.containerName = name;
+      wrap.appendChild(sec);
+    }
+    renderContainerSection(sec, name, c, snap.vars, prevIds[name]);
+  });
+
+  // variables
+  ensureSection('variables');
+  const varsEl = app.dynamicSections.get('variables');
+  const varNames = Object.keys(snap.vars);
+  if (!varNames.length){
+    varsEl.hidden = true;
+  } else {
+    varsEl.hidden = false;
+    varsEl.querySelector('.viz-section-label').innerHTML = `<span>VARIABLES</span>`;
+    const chipsEl = varsEl.querySelector('.var-chips');
+    diffRenderRow(chipsEl, varNames.map(n=>({
+      key: 'var:'+n,
+      name: n,
+      value: snap.vars[n],
+      changed: prevSnap ? prevSnap.vars[n] !== snap.vars[n] : true
+    })), (item)=>{
+      const div = document.createElement('div');
+      div.className = 'var-chip';
+      div.innerHTML = `<span class="vn">${escapeHtml(item.name)}</span><span class="veq">=</span><span class="vv">${escapeHtml(fmtVal(item.value))}</span>`;
+      return div;
+    });
+  }
+
+  // output console
+  ensureSection('output');
+  const outEl = app.dynamicSections.get('output');
+  const prints = app.history.slice(0, app.stepIndex+1).filter(h=>h.air.type==='PRINT');
+  if (!prints.length){
+    outEl.hidden = true;
+  } else {
+    outEl.hidden = false;
+    outEl.querySelector('.body').innerHTML = prints.map(p=>`<div class="oline">${escapeHtml(p.note.replace(/^print:\s*/,''))}</div>`).join('');
+    outEl.querySelector('.body').scrollTop = outEl.querySelector('.body').scrollHeight;
+  }
+}
+
+function cssEscape(s){ return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g,'_'); }
+
+function ensureSection(key){
+  if (app.dynamicSections.has(key)) return;
+  let el;
+  if (key === 'anomaly'){
+    el = document.createElement('div');
+    el.className = 'anomaly-banner';
+    el.hidden = true;
+    els.vizBody.appendChild(el);
+  } else if (key === 'containers-wrap'){
+    el = document.createElement('div');
+    el.style.display = 'contents';
+    els.vizBody.appendChild(el);
+  } else if (key === 'variables'){
+    el = document.createElement('div');
+    el.className = 'viz-section';
+    el.innerHTML = `<div class="viz-section-label"><span>VARIABLES</span></div><div class="var-chips"></div>`;
+    els.vizBody.appendChild(el);
+  } else if (key === 'output'){
+    el = document.createElement('div');
+    el.className = 'viz-section';
+    el.innerHTML = `<div class="viz-section-label"><span>OUTPUT</span></div><div class="output-console body"></div>`;
+    els.vizBody.appendChild(el);
+  }
+  app.dynamicSections.set(key, el);
+}
+
+function renderContainerSection(sec, name, c, vars, prevIdMap){
+  const typeLabel = c.type.toUpperCase();
+  let label = sec.querySelector('.viz-section-label');
+  if (!label){
+    label = document.createElement('div');
+    label.className = 'viz-section-label';
+    sec.appendChild(label);
+  }
+  label.innerHTML = `<span class="name">${escapeHtml(name)}</span><span class="type-pill">${typeLabel}</span><span style="color:var(--text-dim)">len ${c.values.length}</span>`;
+
+  if (c.type === 'array'){
+    let track = sec.querySelector('.row-track');
+    if (!track){
+      track = document.createElement('div');
+      track.className = 'row-track';
+      track.innerHTML = `<div class="row-cells"></div><div class="pointer-track"></div>`;
+      sec.appendChild(track);
+    }
+    const rowCells = track.querySelector('.row-cells');
+    const items = c.values.map((v,i)=>({
+      key: c.ids[i],
+      idx: i,
+      value: v,
+      changed: prevIdMap ? (prevIdMap[c.ids[i]] !== undefined && prevIdMap[c.ids[i]] !== v) : false
+    }));
+    diffRenderRow(rowCells, items, (item)=>{
+      const div = document.createElement('div');
+      div.className = 'cell';
+      div.innerHTML = `${escapeHtml(fmtVal(item.value))}<span class="idx">${item.idx}</span>`;
+      return div;
+    });
+    renderPointers(track.querySelector('.pointer-track'), vars, c.values.length, rowCells);
+  } else if (c.type === 'stack'){
+    let frame = sec.querySelector('.stack-frame');
+    if (!frame){
+      frame = document.createElement('div');
+      frame.className = 'stack-frame';
+      frame.innerHTML = `<div class="stack-top-label"><span>\u25B8</span><span>TOP</span></div><div class="col-cells"></div>`;
+      sec.appendChild(frame);
+    }
+    const colCells = frame.querySelector('.col-cells');
+    const items = c.values.map((v,i)=>({
+      key: c.ids[i], idx:i, value:v,
+      changed: prevIdMap ? (prevIdMap[c.ids[i]] !== undefined && prevIdMap[c.ids[i]] !== v) : false
+    }));
+    diffRenderRow(colCells, items, (item)=>{
+      const div = document.createElement('div');
+      div.className = 'cell stack-cell';
+      div.innerHTML = escapeHtml(fmtVal(item.value));
+      return div;
+    });
+    frame.style.display = c.values.length ? 'block' : 'block';
+  } else if (c.type === 'queue'){
+    let qwrap = sec.querySelector('.queue-wrap');
+    if (!qwrap){
+      qwrap = document.createElement('div');
+      qwrap.className = 'queue-wrap';
+      qwrap.innerHTML = `<div class="queue-labels"><span class="front">\u2039 FRONT</span><span class="back">BACK \u203A</span></div><div class="row-cells"></div>`;
+      sec.appendChild(qwrap);
+    }
+    const rowCells = qwrap.querySelector('.row-cells');
+    const items = c.values.map((v,i)=>({
+      key: c.ids[i], idx:i, value:v,
+      changed: prevIdMap ? (prevIdMap[c.ids[i]] !== undefined && prevIdMap[c.ids[i]] !== v) : false
+    }));
+    diffRenderRow(rowCells, items, (item)=>{
+      const div = document.createElement('div');
+      div.className = 'cell';
+      div.innerHTML = escapeHtml(fmtVal(item.value));
+      return div;
+    });
+  }
+}
+
+function renderPointers(trackEl, vars, len, rowCells){
+  trackEl.innerHTML = '';
+  if (!len) return;
+  const entries = Object.entries(vars).filter(([n,v])=> Number.isInteger(v) && v>=0 && v<len);
+  const cellW = 46, gap = 6;
+  entries.forEach(([n,v], i)=>{
+    const p = document.createElement('div');
+    p.className = 'pointer p' + ((i%4)+1);
+    const left = v*(cellW+gap) + cellW/2;
+    p.style.left = left + 'px';
+    p.innerHTML = `<span class="tri"></span><span class="lbl">${escapeHtml(n)}</span>`;
+    trackEl.appendChild(p);
+  });
+}
+
+/* ---- timeline controls ---- */
+function setStep(i){
+  const max = Math.max(0, app.history.length-1);
+  app.stepIndex = Math.min(Math.max(0,i), max);
+  els.timelineSlider.value = String(app.stepIndex);
+  renderStep();
+}
+els.timelineSlider.addEventListener('input', ()=>{
+  stopPlaying();
+  setStep(parseInt(els.timelineSlider.value,10));
+});
+els.stepBackBtn.addEventListener('click', ()=>{ stopPlaying(); setStep(app.stepIndex-1); });
+els.stepFwdBtn.addEventListener('click', ()=>{ stopPlaying(); setStep(app.stepIndex+1); });
+els.playBtn.addEventListener('click', ()=>{
+  if (app.playing) stopPlaying();
+  else startPlaying();
+});
+function startPlaying(){
+  if (app.history.length <= 1) return;
+  app.playing = true;
+  els.playBtn.classList.add('playing');
+  els.playBtn.textContent = '\u23F8';
+  app.playTimer = setInterval(()=>{
+    if (app.stepIndex >= app.history.length-1){ stopPlaying(); return; }
+    setStep(app.stepIndex+1);
+  }, 480);
+}
+function stopPlaying(){
+  app.playing = false;
+  els.playBtn.classList.remove('playing');
+  els.playBtn.textContent = '\u25B6';
+  if (app.playTimer){ clearInterval(app.playTimer); app.playTimer = null; }
+}
+
+/* ---- init ---- */
+loadExample(app.example, true);
+setStep(0);
+window.addEventListener('resize', autoresize);
+
+})();
+</script>
+</body>
+</html>
