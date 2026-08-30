@@ -130,11 +130,33 @@ body{
 .narration{
   font-size:14px; text-align:center; color:var(--text-hi); font-weight:600; padding:10px 16px;
   background:var(--panel-2); border:1px solid var(--line); border-radius:10px; min-height:20px;
+  flex-shrink:0;
 }
 .narration .nk{ color:var(--accent); }
-.ds-block{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
-.ds-label{ font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--text-mid); font-weight:700; margin-bottom:10px; }
+/* flex-shrink:0 is the fix for the "graph panel disappears" bug: .viz-scroll is a
+   column flex container, and by default flex children shrink to fit rather than
+   overflow — with several blocks stacked (call stack, graph, visited, ...) the
+   browser would compress the largest one (usually the graph/tree/linked-list SVG)
+   down toward zero height instead of just letting .viz-scroll's own overflow:auto
+   scroll. Pinning every block to its natural size means nothing gets crushed —
+   the panel scrolls instead, exactly like the CSS overflow:auto already intended. */
+.ds-block{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; flex-shrink:0; }
+.ds-label{ font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--text-mid); font-weight:700; }
 .ds-empty{ color:var(--text-dim); font-family:var(--font-mono); font-size:12px; padding:6px 0; }
+
+/* collapsible block header — every ds-block's label doubles as a click target
+   so the user can hide blocks they don't care about right now (e.g. collapse
+   CALL STACK to make more room for GRAPH) instead of scrolling past them. */
+.ds-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; user-select:none; margin-bottom:10px; }
+.ds-head .ds-label{ margin-bottom:0; }
+.ds-head:hover .ds-label{ color:var(--text-hi); }
+.ds-head:focus-visible{ outline:1px solid var(--accent); outline-offset:2px; border-radius:4px; }
+.ds-chevron{ color:var(--text-dim); font-size:9px; line-height:1; flex-shrink:0; transition:transform 160ms ease; }
+.ds-head:hover .ds-chevron{ color:var(--text-mid); }
+.ds-block.collapsed{ padding-bottom:14px; }
+.ds-block.collapsed .ds-head{ margin-bottom:0; }
+.ds-block.collapsed .ds-chevron{ transform:rotate(-90deg); }
+.ds-block.collapsed > *:not(.ds-head){ display:none; }
 
 /* array */
 .array-flags-row{ display:flex; }
@@ -164,6 +186,8 @@ body{
   width:40px; height:40px; background:var(--inset); border:1px solid var(--line); border-radius:6px;
   display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:12.5px; color:var(--text-hi);
 }
+.grid-cell.cell-visited{ background:var(--accent-dim); border-color:var(--accent); }
+.grid-cell.cell-active{ border-color:var(--pink); box-shadow:0 0 0 1px var(--pink), 0 0 10px rgba(255,143,214,.45); background:rgba(255,143,214,.14); }
 
 /* stack */
 .stack-body{ display:flex; flex-direction:column; align-items:center; }
@@ -205,8 +229,12 @@ body{
 .scalar-chip.bool-false .scalar-val{ color:var(--danger); }
 .scalar-chip.is-none .scalar-val{ color:var(--text-dim); }
 
-/* call stack */
-.callstack-body{ display:flex; flex-direction:column; gap:6px; }
+/* call stack — capped height with its own internal scroll. Recursion depth is
+   unbounded, so without this a deep call stack keeps growing taller forever and
+   pushes every other block further down the page. Scrolling inside the call
+   stack itself keeps its footprint predictable so GRAPH/VISITED/etc. below it
+   stay reachable without the whole viz panel growing out of control. */
+.callstack-body{ display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; padding-right:4px; }
 .callstack-frame{ border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--inset); }
 .callstack-frame.frame-active{ border-color:var(--pink); box-shadow:0 0 0 1px rgba(255,143,214,.35); }
 .frame-head{ font-family:var(--font-mono); font-size:11.5px; color:var(--pink); font-weight:700; margin-bottom:5px; }
@@ -229,8 +257,10 @@ body{
 .tree-edge{ stroke:var(--line); stroke-width:2; }
 
 .graph-node{ fill:var(--inset); stroke:var(--accent); stroke-width:1.5; }
+.graph-node-active{ stroke:var(--pink); stroke-width:2.5; filter:drop-shadow(0 0 4px var(--pink)); }
 .graph-val{ fill:var(--text-hi); font-family:var(--font-mono); font-size:11px; font-weight:700; }
 .graph-edge{ stroke:var(--line); stroke-width:1.5; }
+.graph-edge-active{ stroke:var(--pink); stroke-width:2.5; }
 
 /* output console */
 .output-console{ font-family:var(--font-mono); font-size:12px; color:var(--accent); background:var(--inset); border:1px solid var(--line); border-radius:9px; padding:10px 12px; }

@@ -251,7 +251,16 @@ class LeetCodeVisualizer {
         }
         case 'stack': R.renderStack(vizArea, v.heapObj, { heap, label: v.name }); break;
         case 'queue': R.renderQueue(vizArea, v.heapObj, { heap, label: v.name }); break;
-        case 'grid': R.renderGrid(vizArea, v.heapObj, { heap, label: v.name }); break;
+        case 'grid': {
+          const { activeCell, visitedCells } = E.computeGridOverlay(step, v.heapObj, heap);
+          R.renderGrid(vizArea, v.heapObj, { heap, label: v.name, activeCell, visitedCells });
+          break;
+        }
+        case 'adjacency_list': {
+          const pointers = R.collectPointers(step.world.frames, v.heapObj.id).filter(p => p.name !== v.name);
+          R.renderAdjacencyGraph(vizArea, v.heapObj, heap, { label: v.name, pointers });
+          break;
+        }
         case 'map': R.renderMap(vizArea, v.heapObj, { heap, label: v.name }); break;
         case 'set': R.renderSet(vizArea, v.heapObj, { heap, label: v.name }); break;
         case 'tuple': R.renderArray(vizArea, v.heapObj, { heap, pointers: [], colorCache, label: v.name + ' (tuple)' }); break;

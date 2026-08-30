@@ -258,12 +258,50 @@ function computeRoles(steps){
   return roles;
 }
 
+function isHeapRef(v){ return v && typeof v === 'object' && '__ref' in v; }
+
+// Adjacency-list graph: a list of lists whose every element is a plain integer
+// that's a valid index back into the SAME outer list (i.e. a vertex id).
+// This is the standard competitive-programming graph representation
+// (`graph = [[] for _ in range(V)]`, `graph[u].append(v)`), as opposed to a
+// numeric/char matrix where values aren't self-referential indices.
+function looksLikeAdjacencyList(heapListObj, heap){
+  const n = heapListObj.items.length;
+  if (n < 2) return false;
+  let total = 0, validIdx = 0;
+  const rowLengths = [];
+  for (const it of heapListObj.items){
+    if (!isHeapRef(it.value)) return false;
+    const inner = heap[it.value.__ref];
+    if (!inner || inner.type !== 'list') return false;
+    rowLengths.push(inner.items.length);
+    for (const innerIt of inner.items){
+      total++;
+      const v = innerIt.value;
+      if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < n) validIdx++;
+      else return false; // any non-vertex-index element rules out "pure adjacency list"
+    }
+  }
+  if (total === 0 || validIdx !== total) return false;
+  // Real 2D grids/matrices are almost always rectangular (every row the same
+  // length); real adjacency lists are essentially never perfectly uniform
+  // across every vertex in practice. A uniform-length list of small ints
+  // (e.g. a 0/1 island grid) is the classic false-positive here, since 0/1
+  // are trivially "valid vertex indices" too — so require raggedness unless
+  // there are very few vertices (a k-regular graph on 2-3 nodes is plausible).
+  const uniform = rowLengths.every(l => l === rowLengths[0]);
+  if (uniform) return false;
+  return true;
+}
+
 function decideListRole(heapListObj, roleInfo, heap){
-  // grid check first: every item is a ref to a list
-  const isGrid = heapListObj.items.length > 0 && heapListObj.items.every(it =>
-    it.value && typeof it.value === 'object' && '__ref' in it.value && heap[it.value.__ref] && heap[it.value.__ref].type === 'list'
-  );
-  if (isGrid) return 'grid';
+  const isListOfLists = heapListObj.items.length > 0 && heapListObj.items.every(it => isHeapRef(it.value) && heap[it.value.__ref] && heap[it.value.__ref].type === 'list');
+  if (isListOfLists){
+    const nameHint = (roleInfo ? roleInfo.nameHint : '').toLowerCase();
+    const graphNameHint = /graph|adjacen|adj_list|edges?$/.test(nameHint);
+    if (graphNameHint || looksLikeAdjacencyList(heapListObj, heap)) return 'adjacency_list';
+    return 'grid';
+  }
   const s = roleInfo ? roleInfo.stats : null;
   const nameHint = (roleInfo ? roleInfo.nameHint : '').toLowerCase();
   if (s){
@@ -345,6 +383,65 @@ function objectPointerList(step){
     }
   }
   return out;
+}
+
+function deref(v, heap){ return (v && typeof v === 'object' && '__ref' in v) ? heap[v.__ref] : v; }
+
+// For 2D-grid problems (Number of Islands, Flood Fill, etc.): figure out which
+// cell is currently being visited (from row/col-shaped int variables in scope)
+// and which cells have already been visited (from a set/dict of (r,c) tuples
+// in scope), so the grid can show the traversal spreading like a graph would.
+function computeGridOverlay(step, heapObj, heap){
+  const numRows = heapObj.items.length;
+  const firstRow = numRows ? deref(heapObj.items[0].value, heap) : null;
+  const numCols = firstRow && firstRow.type === 'list' ? firstRow.items.length : 0;
+
+  const byName = new Map();
+  for (const frame of step.world.frames){
+    for (const k in frame.vars){
+      byName.set(k, frame.vars[k]);
+    }
+  }
+  const intVars = {};
+  for (const [k, v] of byName) if (typeof v === 'number' && Number.isInteger(v)) intVars[k] = v;
+
+  const NAME_PAIRS = [['i','j'],['r','c'],['row','col'],['row','column'],['x','y'],['ri','ci']];
+  let activeCell = null;
+  for (const [rn, cn] of NAME_PAIRS){
+    if (intVars[rn] !== undefined && intVars[cn] !== undefined){
+      const r = intVars[rn], c = intVars[cn];
+      if (r >= 0 && r < numRows && c >= 0 && c < numCols){ activeCell = [r, c]; break; }
+    }
+  }
+  if (!activeCell){
+    const rowCands = Object.entries(intVars).filter(([n,v]) => v>=0 && v<numRows);
+    const colCands = Object.entries(intVars).filter(([n,v]) => v>=0 && v<numCols);
+    if (rowCands.length === 1 && colCands.length === 1 && rowCands[0][0] !== colCands[0][0]){
+      activeCell = [rowCands[0][1], colCands[0][1]];
+    }
+  }
+
+  // find a set/dict of (row,col) tuples anywhere in scope (visited/seen-style)
+  let visitedCells = null;
+  function tupleRC(v){
+    if (v && v.__ref){ const o = heap[v.__ref]; if (o && o.type === 'tuple' && o.values.length === 2 &&
+      typeof o.values[0] === 'number' && typeof o.values[1] === 'number') return o.values; }
+    return null;
+  }
+  for (const [, v] of byName){
+    if (!v || !v.__ref) continue;
+    const obj = heap[v.__ref];
+    if (!obj) continue;
+    if (obj.type === 'set'){
+      const cells = obj.items.map(it => tupleRC(it.value)).filter(Boolean);
+      if (cells.length){ visitedCells = cells; break; }
+    } else if (obj.type === 'dict'){
+      const cells = obj.entries.map(e => tupleRC(e.key)).filter(Boolean);
+      if (cells.length){ visitedCells = cells; break; }
+    }
+  }
+
+  return { activeCell, visitedCells };
 }
 
 function classifyError(e, source){
@@ -432,6 +529,6 @@ function runPython(source, opts={}){
   return result;
 }
 
-const exportObj = { runPython, snapshotWorld, findEntry, synthArgs, classifyError, UsageTracker, classifyValue, computeRoles, decideListRole, pickVizVars, objectPointerList };
+const exportObj = { runPython, snapshotWorld, findEntry, synthArgs, classifyError, UsageTracker, classifyValue, computeRoles, decideListRole, pickVizVars, objectPointerList, computeGridOverlay };
 if (typeof module !== 'undefined') module.exports = exportObj;
 else window.PyEngine = exportObj;

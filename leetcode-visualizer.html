@@ -139,11 +139,33 @@ body{
 .narration{
   font-size:14px; text-align:center; color:var(--text-hi); font-weight:600; padding:10px 16px;
   background:var(--panel-2); border:1px solid var(--line); border-radius:10px; min-height:20px;
+  flex-shrink:0;
 }
 .narration .nk{ color:var(--accent); }
-.ds-block{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
-.ds-label{ font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--text-mid); font-weight:700; margin-bottom:10px; }
+/* flex-shrink:0 is the fix for the "graph panel disappears" bug: .viz-scroll is a
+   column flex container, and by default flex children shrink to fit rather than
+   overflow — with several blocks stacked (call stack, graph, visited, ...) the
+   browser would compress the largest one (usually the graph/tree/linked-list SVG)
+   down toward zero height instead of just letting .viz-scroll's own overflow:auto
+   scroll. Pinning every block to its natural size means nothing gets crushed —
+   the panel scrolls instead, exactly like the CSS overflow:auto already intended. */
+.ds-block{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; flex-shrink:0; }
+.ds-label{ font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:var(--text-mid); font-weight:700; }
 .ds-empty{ color:var(--text-dim); font-family:var(--font-mono); font-size:12px; padding:6px 0; }
+
+/* collapsible block header — every ds-block's label doubles as a click target
+   so the user can hide blocks they don't care about right now (e.g. collapse
+   CALL STACK to make more room for GRAPH) instead of scrolling past them. */
+.ds-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; user-select:none; margin-bottom:10px; }
+.ds-head .ds-label{ margin-bottom:0; }
+.ds-head:hover .ds-label{ color:var(--text-hi); }
+.ds-head:focus-visible{ outline:1px solid var(--accent); outline-offset:2px; border-radius:4px; }
+.ds-chevron{ color:var(--text-dim); font-size:9px; line-height:1; flex-shrink:0; transition:transform 160ms ease; }
+.ds-head:hover .ds-chevron{ color:var(--text-mid); }
+.ds-block.collapsed{ padding-bottom:14px; }
+.ds-block.collapsed .ds-head{ margin-bottom:0; }
+.ds-block.collapsed .ds-chevron{ transform:rotate(-90deg); }
+.ds-block.collapsed > *:not(.ds-head){ display:none; }
 
 /* array */
 .array-flags-row{ display:flex; }
@@ -173,6 +195,8 @@ body{
   width:40px; height:40px; background:var(--inset); border:1px solid var(--line); border-radius:6px;
   display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:12.5px; color:var(--text-hi);
 }
+.grid-cell.cell-visited{ background:var(--accent-dim); border-color:var(--accent); }
+.grid-cell.cell-active{ border-color:var(--pink); box-shadow:0 0 0 1px var(--pink), 0 0 10px rgba(255,143,214,.45); background:rgba(255,143,214,.14); }
 
 /* stack */
 .stack-body{ display:flex; flex-direction:column; align-items:center; }
@@ -214,8 +238,12 @@ body{
 .scalar-chip.bool-false .scalar-val{ color:var(--danger); }
 .scalar-chip.is-none .scalar-val{ color:var(--text-dim); }
 
-/* call stack */
-.callstack-body{ display:flex; flex-direction:column; gap:6px; }
+/* call stack — capped height with its own internal scroll. Recursion depth is
+   unbounded, so without this a deep call stack keeps growing taller forever and
+   pushes every other block further down the page. Scrolling inside the call
+   stack itself keeps its footprint predictable so GRAPH/VISITED/etc. below it
+   stay reachable without the whole viz panel growing out of control. */
+.callstack-body{ display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; padding-right:4px; }
 .callstack-frame{ border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--inset); }
 .callstack-frame.frame-active{ border-color:var(--pink); box-shadow:0 0 0 1px rgba(255,143,214,.35); }
 .frame-head{ font-family:var(--font-mono); font-size:11.5px; color:var(--pink); font-weight:700; margin-bottom:5px; }
@@ -238,8 +266,10 @@ body{
 .tree-edge{ stroke:var(--line); stroke-width:2; }
 
 .graph-node{ fill:var(--inset); stroke:var(--accent); stroke-width:1.5; }
+.graph-node-active{ stroke:var(--pink); stroke-width:2.5; filter:drop-shadow(0 0 4px var(--pink)); }
 .graph-val{ fill:var(--text-hi); font-family:var(--font-mono); font-size:11px; font-weight:700; }
 .graph-edge{ stroke:var(--line); stroke-width:1.5; }
+.graph-edge-active{ stroke:var(--pink); stroke-width:2.5; }
 
 /* output console */
 .output-console{ font-family:var(--font-mono); font-size:12px; color:var(--accent); background:var(--inset); border:1px solid var(--line); border-radius:9px; padding:10px 12px; }
@@ -3233,12 +3263,50 @@ function computeRoles(steps){
   return roles;
 }
 
+function isHeapRef(v){ return v && typeof v === 'object' && '__ref' in v; }
+
+// Adjacency-list graph: a list of lists whose every element is a plain integer
+// that's a valid index back into the SAME outer list (i.e. a vertex id).
+// This is the standard competitive-programming graph representation
+// (`graph = [[] for _ in range(V)]`, `graph[u].append(v)`), as opposed to a
+// numeric/char matrix where values aren't self-referential indices.
+function looksLikeAdjacencyList(heapListObj, heap){
+  const n = heapListObj.items.length;
+  if (n < 2) return false;
+  let total = 0, validIdx = 0;
+  const rowLengths = [];
+  for (const it of heapListObj.items){
+    if (!isHeapRef(it.value)) return false;
+    const inner = heap[it.value.__ref];
+    if (!inner || inner.type !== 'list') return false;
+    rowLengths.push(inner.items.length);
+    for (const innerIt of inner.items){
+      total++;
+      const v = innerIt.value;
+      if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < n) validIdx++;
+      else return false; // any non-vertex-index element rules out "pure adjacency list"
+    }
+  }
+  if (total === 0 || validIdx !== total) return false;
+  // Real 2D grids/matrices are almost always rectangular (every row the same
+  // length); real adjacency lists are essentially never perfectly uniform
+  // across every vertex in practice. A uniform-length list of small ints
+  // (e.g. a 0/1 island grid) is the classic false-positive here, since 0/1
+  // are trivially "valid vertex indices" too — so require raggedness unless
+  // there are very few vertices (a k-regular graph on 2-3 nodes is plausible).
+  const uniform = rowLengths.every(l => l === rowLengths[0]);
+  if (uniform) return false;
+  return true;
+}
+
 function decideListRole(heapListObj, roleInfo, heap){
-  // grid check first: every item is a ref to a list
-  const isGrid = heapListObj.items.length > 0 && heapListObj.items.every(it =>
-    it.value && typeof it.value === 'object' && '__ref' in it.value && heap[it.value.__ref] && heap[it.value.__ref].type === 'list'
-  );
-  if (isGrid) return 'grid';
+  const isListOfLists = heapListObj.items.length > 0 && heapListObj.items.every(it => isHeapRef(it.value) && heap[it.value.__ref] && heap[it.value.__ref].type === 'list');
+  if (isListOfLists){
+    const nameHint = (roleInfo ? roleInfo.nameHint : '').toLowerCase();
+    const graphNameHint = /graph|adjacen|adj_list|edges?$/.test(nameHint);
+    if (graphNameHint || looksLikeAdjacencyList(heapListObj, heap)) return 'adjacency_list';
+    return 'grid';
+  }
   const s = roleInfo ? roleInfo.stats : null;
   const nameHint = (roleInfo ? roleInfo.nameHint : '').toLowerCase();
   if (s){
@@ -3320,6 +3388,65 @@ function objectPointerList(step){
     }
   }
   return out;
+}
+
+function deref(v, heap){ return (v && typeof v === 'object' && '__ref' in v) ? heap[v.__ref] : v; }
+
+// For 2D-grid problems (Number of Islands, Flood Fill, etc.): figure out which
+// cell is currently being visited (from row/col-shaped int variables in scope)
+// and which cells have already been visited (from a set/dict of (r,c) tuples
+// in scope), so the grid can show the traversal spreading like a graph would.
+function computeGridOverlay(step, heapObj, heap){
+  const numRows = heapObj.items.length;
+  const firstRow = numRows ? deref(heapObj.items[0].value, heap) : null;
+  const numCols = firstRow && firstRow.type === 'list' ? firstRow.items.length : 0;
+
+  const byName = new Map();
+  for (const frame of step.world.frames){
+    for (const k in frame.vars){
+      byName.set(k, frame.vars[k]);
+    }
+  }
+  const intVars = {};
+  for (const [k, v] of byName) if (typeof v === 'number' && Number.isInteger(v)) intVars[k] = v;
+
+  const NAME_PAIRS = [['i','j'],['r','c'],['row','col'],['row','column'],['x','y'],['ri','ci']];
+  let activeCell = null;
+  for (const [rn, cn] of NAME_PAIRS){
+    if (intVars[rn] !== undefined && intVars[cn] !== undefined){
+      const r = intVars[rn], c = intVars[cn];
+      if (r >= 0 && r < numRows && c >= 0 && c < numCols){ activeCell = [r, c]; break; }
+    }
+  }
+  if (!activeCell){
+    const rowCands = Object.entries(intVars).filter(([n,v]) => v>=0 && v<numRows);
+    const colCands = Object.entries(intVars).filter(([n,v]) => v>=0 && v<numCols);
+    if (rowCands.length === 1 && colCands.length === 1 && rowCands[0][0] !== colCands[0][0]){
+      activeCell = [rowCands[0][1], colCands[0][1]];
+    }
+  }
+
+  // find a set/dict of (row,col) tuples anywhere in scope (visited/seen-style)
+  let visitedCells = null;
+  function tupleRC(v){
+    if (v && v.__ref){ const o = heap[v.__ref]; if (o && o.type === 'tuple' && o.values.length === 2 &&
+      typeof o.values[0] === 'number' && typeof o.values[1] === 'number') return o.values; }
+    return null;
+  }
+  for (const [, v] of byName){
+    if (!v || !v.__ref) continue;
+    const obj = heap[v.__ref];
+    if (!obj) continue;
+    if (obj.type === 'set'){
+      const cells = obj.items.map(it => tupleRC(it.value)).filter(Boolean);
+      if (cells.length){ visitedCells = cells; break; }
+    } else if (obj.type === 'dict'){
+      const cells = obj.entries.map(e => tupleRC(e.key)).filter(Boolean);
+      if (cells.length){ visitedCells = cells; break; }
+    }
+  }
+
+  return { activeCell, visitedCells };
 }
 
 function classifyError(e, source){
@@ -3407,7 +3534,7 @@ function runPython(source, opts={}){
   return result;
 }
 
-const exportObj = { runPython, snapshotWorld, findEntry, synthArgs, classifyError, UsageTracker, classifyValue, computeRoles, decideListRole, pickVizVars, objectPointerList };
+const exportObj = { runPython, snapshotWorld, findEntry, synthArgs, classifyError, UsageTracker, classifyValue, computeRoles, decideListRole, pickVizVars, objectPointerList, computeGridOverlay };
 if (typeof module !== 'undefined') module.exports = exportObj;
 else window.PyEngine = exportObj;
 
@@ -3522,11 +3649,45 @@ else window.PyEngine = exportObj;
     return cache.map.get(name);
   }
 
+  // ---------- collapsible block headers ----------
+  // Every visualization block (array/graph/tree/call-stack/...) is fully
+  // re-rendered from scratch on every animation step (the container's
+  // innerHTML gets wiped), so per-block collapsed/expanded state can't live on
+  // the DOM node itself — it would reset every step. Instead it lives here, in
+  // a module-level Set keyed by a stable id, which survives across re-renders
+  // because it's just a JS closure variable, not part of the DOM that gets
+  // discarded. This is what lets a user collapse e.g. the call stack once and
+  // have it stay collapsed as playback continues.
+  const collapsedBlocks = new Set();
+  function addHeader(wrap, label, key){
+    if (!label) return null;
+    const blockKey = key || label;
+    const head = el('div', 'ds-head', wrap);
+    el('div', 'ds-label', head).textContent = label;
+    const chevron = el('span', 'ds-chevron', head);
+    chevron.textContent = '\u25BE';
+    chevron.setAttribute('aria-hidden', 'true');
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
+    head.title = 'Click to collapse or expand';
+    if (collapsedBlocks.has(blockKey)) wrap.classList.add('collapsed');
+    const toggle = () => {
+      if (collapsedBlocks.has(blockKey)) collapsedBlocks.delete(blockKey);
+      else collapsedBlocks.add(blockKey);
+      wrap.classList.toggle('collapsed');
+    };
+    head.addEventListener('click', toggle);
+    head.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault && e.preventDefault(); toggle(); }
+    });
+    return head;
+  }
+
   // ---------- array / string ----------
   function renderArray(container, list, opts){
     const { heap, pointers, colorCache, label, highlightIdx, compareIdx, mismatchIdx } = opts;
     const wrap = el('div', 'ds-block ds-array', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const flagsRow = el('div', 'array-flags-row', wrap);
     const cellsRow = el('div', 'array-cells-row', wrap);
     const idxRow = el('div', 'array-idx-row', wrap);
@@ -3568,9 +3729,10 @@ else window.PyEngine = exportObj;
 
   // ---------- 2D grid ----------
   function renderGrid(container, list, opts){
-    const { heap, label, activeCell } = opts;
+    const { heap, label, activeCell, visitedCells } = opts;
     const wrap = el('div', 'ds-block ds-grid', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
+    const visitedKeys = new Set((visitedCells||[]).map(([r,c]) => r+','+c));
     const table = el('div', 'grid-table', wrap);
     list.items.forEach((rowRefItem, ri) => {
       const rowVal = deref(rowRefItem.value, heap);
@@ -3579,6 +3741,7 @@ else window.PyEngine = exportObj;
         rowVal.items.forEach((cellItem, ci) => {
           const cell = el('div', 'grid-cell', rowEl);
           cell.setAttribute('data-flip-key', 'gcell:'+cellItem.id);
+          if (visitedKeys.has(ri+','+ci)) cell.classList.add('cell-visited');
           if (activeCell && activeCell[0]===ri && activeCell[1]===ci) cell.classList.add('cell-active');
           cell.textContent = fmtScalar(deref(cellItem.value, heap));
         });
@@ -3591,7 +3754,7 @@ else window.PyEngine = exportObj;
   function renderStack(container, list, opts){
     const { heap, label } = opts;
     const wrap = el('div', 'ds-block ds-stack', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const body = el('div', 'stack-body', wrap);
     if (list.items.length === 0){ el('div', 'ds-empty', body).textContent = '(empty)'; return wrap; }
     const top = el('div', 'stack-top-flag', body);
@@ -3612,7 +3775,7 @@ else window.PyEngine = exportObj;
   function renderQueue(container, list, opts){
     const { heap, label } = opts;
     const wrap = el('div', 'ds-block ds-queue', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const body = el('div', 'queue-body', wrap);
     el('div', 'queue-flag front', body).textContent = 'FRONT';
     const row = el('div', 'queue-row', body);
@@ -3631,7 +3794,7 @@ else window.PyEngine = exportObj;
   function renderMap(container, dict, opts){
     const { heap, label } = opts;
     const wrap = el('div', 'ds-block ds-map', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label + (dict.isDefaultdict ? ' (defaultdict)' : '');
+    addHeader(wrap, label && (label + (dict.isDefaultdict ? ' (defaultdict)' : '')), label);
     const body = el('div', 'chip-row', wrap);
     dict.entries.forEach(e => {
       const chip = el('div', 'map-chip', body);
@@ -3646,7 +3809,7 @@ else window.PyEngine = exportObj;
   function renderSet(container, set, opts){
     const { heap, label } = opts;
     const wrap = el('div', 'ds-block ds-set', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const body = el('div', 'chip-row', wrap);
     set.items.forEach(it => {
       const chip = el('div', 'set-chip', body);
@@ -3661,7 +3824,7 @@ else window.PyEngine = exportObj;
   function renderLinkedList(container, headRef, heap, opts){
     const { label, pointers } = opts;
     const wrap = el('div', 'ds-block ds-linkedlist', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const nodes = [];
     const seen = new Map();
     let cur = headRef;
@@ -3736,7 +3899,7 @@ else window.PyEngine = exportObj;
   function renderTree(container, rootRef, heap, opts){
     const { label } = opts;
     const wrap = el('div', 'ds-block ds-tree', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const rootObj = deref(rootRef, heap);
     if (!rootObj || rootObj.type !== 'object'){ el('div','ds-empty',wrap).textContent='None'; return wrap; }
     const nodes = []; const idToIdx = new Map(); let leafX = 0;
@@ -3785,7 +3948,7 @@ else window.PyEngine = exportObj;
   function renderGraph(container, startRef, heap, opts){
     const { label } = opts;
     const wrap = el('div', 'ds-block ds-graph', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const startObj = deref(startRef, heap);
     if (!startObj || startObj.type !== 'object'){ el('div','ds-empty',wrap).textContent='None'; return wrap; }
     const nodes = []; const idToIdx = new Map(); const edges = [];
@@ -3831,6 +3994,88 @@ else window.PyEngine = exportObj;
     return wrap;
   }
 
+  // Adjacency-list graph: heapListObj is a PyList of PyLists, e.g.
+  // graph = [[1,2], [0,3,4], [0,5], [1], [1,6], [2], [4]]  ->  index i is a
+  // vertex, each entry in graph[i] is an edge to that vertex.
+  function renderAdjacencyGraph(container, heapListObj, heap, opts){
+    const { label, pointers } = opts;
+    const wrap = el('div', 'ds-block ds-graph', container);
+    addHeader(wrap, label);
+    const n = heapListObj.items.length;
+    if (n === 0){ el('div','ds-empty',wrap).textContent = '(empty)'; return wrap; }
+
+    const edges = [];
+    const seenEdge = new Set();
+    heapListObj.items.forEach((it, i) => {
+      const inner = deref(it.value, heap);
+      if (!inner || inner.type !== 'list') return;
+      for (const innerIt of inner.items){
+        const v = innerIt.value;
+        if (typeof v !== 'number' || v < 0 || v >= n) continue; // ignore anything not a valid vertex id
+        const a = i, b = v;
+        const k = a < b ? a+'-'+b : b+'-'+a;
+        if (seenEdge.has(k) && a !== b) continue;
+        seenEdge.add(k);
+        edges.push([a, b]);
+      }
+    });
+
+    const R = 19, CX = 160, CY = 150, RADIUS = Math.max(80, n * 13);
+    const svg = svgEl('svg', { viewBox:`0 0 ${CX*2} ${CY*2}`, class:'graph-svg', style:`width:${CX*2}px;height:${CY*2}px` });
+    const g = svgEl('g'); svg.appendChild(g);
+    const positions = [];
+    for (let i = 0; i < n; i++){
+      const angle = (2*Math.PI*i)/n - Math.PI/2;
+      positions.push({ x: CX + RADIUS*Math.cos(angle), y: CY + RADIUS*Math.sin(angle) });
+    }
+
+    const activeIdx = new Set((pointers||[]).map(p => p.idx).filter(i => i>=0 && i<n));
+    const activeEdgeKey = (pointers||[]).length >= 2 ? (() => {
+      const idxs = pointers.map(p=>p.idx).filter(i=>i>=0&&i<n);
+      if (idxs.length < 2) return null;
+      const a = idxs[idxs.length-2], b = idxs[idxs.length-1];
+      return a<b ? a+'-'+b : b+'-'+a;
+    })() : null;
+
+    for (const [a,b] of edges){
+      const k = a<b?a+'-'+b:b+'-'+a;
+      const isActive = k === activeEdgeKey;
+      g.appendChild(svgEl('line', {
+        x1:positions[a].x, y1:positions[a].y, x2:positions[b].x, y2:positions[b].y,
+        class: 'graph-edge' + (isActive ? ' graph-edge-active' : '')
+      }));
+    }
+    for (let i = 0; i < n; i++){
+      const p = positions[i];
+      const isActive = activeIdx.has(i);
+      g.appendChild(svgEl('circle', { cx:p.x, cy:p.y, r:R, class:'graph-node' + (isActive ? ' graph-node-active' : '') }));
+      const txt = svgEl('text', { x:p.x, y:p.y+5, class:'graph-val', 'text-anchor':'middle' });
+      txt.textContent = String(i);
+      g.appendChild(txt);
+    }
+    // pointer flags (vertex/neighbour/etc) above the node they currently reference
+    const byIdx = new Map();
+    for (const ptr of (pointers||[])){
+      if (ptr.idx < 0 || ptr.idx >= n) continue;
+      if (!byIdx.has(ptr.idx)) byIdx.set(ptr.idx, []);
+      byIdx.get(ptr.idx).push(ptr.name);
+    }
+    byIdx.forEach((names, idx) => {
+      const p = positions[idx];
+      names.forEach((name, fi) => {
+        const fy = p.y - R - 10 - fi*20;
+        const w = Math.max(34, name.length*7+12);
+        g.appendChild(svgEl('rect', { x:p.x-w/2, y:fy-13, width:w, height:17, rx:5, class:'ll-flag-bg' }));
+        const t = svgEl('text', { x:p.x, y:fy-1, class:'ll-flag-txt', 'text-anchor':'middle' });
+        t.textContent = name;
+        g.appendChild(t);
+      });
+    });
+
+    wrap.appendChild(svg);
+    return wrap;
+  }
+
   // ---------- scalar chips ----------
   function renderScalars(container, entries){
     const wrap = el('div', 'ds-block ds-scalars', container);
@@ -3850,7 +4095,9 @@ else window.PyEngine = exportObj;
   function renderCallStack(container, frames){
     if (frames.length <= 1) return null; // only globals, no active calls
     const wrap = el('div', 'ds-block ds-callstack', container);
-    el('div', 'ds-label', wrap).textContent = `CALL STACK (depth ${frames.length-1})`;
+    // Fixed key (not the label) — the label's depth number changes every
+    // step, but we want collapse state to stay put across those changes.
+    addHeader(wrap, `CALL STACK (depth ${frames.length-1})`, 'call-stack');
     const body = el('div', 'callstack-body', wrap);
     for (let i = frames.length - 1; i >= 1; i--){
       const f = frames[i];
@@ -3872,8 +4119,9 @@ else window.PyEngine = exportObj;
 
   const exportObj = {
     el, svgEl, fmtScalar, isRef, deref, flipCapture, flipApply, collectPointers, pointersForIndex, colorForName,
+    addHeader,
     renderArray, renderGrid, renderStack, renderQueue, renderMap, renderSet, renderLinkedList, renderTree, renderGraph,
-    renderScalars, renderCallStack
+    renderScalars, renderCallStack, renderAdjacencyGraph
   };
   if (typeof module !== 'undefined') module.exports = exportObj;
   else window.PyRenderer = exportObj;
@@ -4148,7 +4396,16 @@ else window.PyEngine = exportObj;
         }
         case 'stack': R.renderStack(vizScroll, v.heapObj, { heap, label }); break;
         case 'queue': R.renderQueue(vizScroll, v.heapObj, { heap, label }); break;
-        case 'grid': R.renderGrid(vizScroll, v.heapObj, { heap, label }); break;
+        case 'grid': {
+          const { activeCell, visitedCells } = E.computeGridOverlay(step, v.heapObj, heap);
+          R.renderGrid(vizScroll, v.heapObj, { heap, label, activeCell, visitedCells });
+          break;
+        }
+        case 'adjacency_list': {
+          const pointers = R.collectPointers(step.world.frames, v.heapObj.id).filter(p => p.name !== v.name);
+          R.renderAdjacencyGraph(vizScroll, v.heapObj, heap, { label, pointers });
+          break;
+        }
         case 'map': R.renderMap(vizScroll, v.heapObj, { heap, label }); break;
         case 'set': R.renderSet(vizScroll, v.heapObj, { heap, label }); break;
         case 'tuple': R.renderArray(vizScroll, v.heapObj, { heap, pointers: [], colorCache, label: label + ' (tuple)' }); break;
@@ -4157,7 +4414,7 @@ else window.PyEngine = exportObj;
         case 'graph': R.renderGraph(vizScroll, v.ref, heap, { label }); break;
         case 'object': {
           const wrap = R.el('div', 'ds-block ds-map', vizScroll);
-          R.el('div', 'ds-label', wrap).textContent = label + '  (' + v.heapObj.className + ')';
+          R.addHeader(wrap, label + '  (' + v.heapObj.className + ')', label);
           const row = R.el('div', 'chip-row', wrap);
           for (const k in v.heapObj.attrs){
             const val = v.heapObj.attrs[k];

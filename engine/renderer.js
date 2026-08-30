@@ -105,11 +105,45 @@
     return cache.map.get(name);
   }
 
+  // ---------- collapsible block headers ----------
+  // Every visualization block (array/graph/tree/call-stack/...) is fully
+  // re-rendered from scratch on every animation step (the container's
+  // innerHTML gets wiped), so per-block collapsed/expanded state can't live on
+  // the DOM node itself — it would reset every step. Instead it lives here, in
+  // a module-level Set keyed by a stable id, which survives across re-renders
+  // because it's just a JS closure variable, not part of the DOM that gets
+  // discarded. This is what lets a user collapse e.g. the call stack once and
+  // have it stay collapsed as playback continues.
+  const collapsedBlocks = new Set();
+  function addHeader(wrap, label, key){
+    if (!label) return null;
+    const blockKey = key || label;
+    const head = el('div', 'ds-head', wrap);
+    el('div', 'ds-label', head).textContent = label;
+    const chevron = el('span', 'ds-chevron', head);
+    chevron.textContent = '\u25BE';
+    chevron.setAttribute('aria-hidden', 'true');
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
+    head.title = 'Click to collapse or expand';
+    if (collapsedBlocks.has(blockKey)) wrap.classList.add('collapsed');
+    const toggle = () => {
+      if (collapsedBlocks.has(blockKey)) collapsedBlocks.delete(blockKey);
+      else collapsedBlocks.add(blockKey);
+      wrap.classList.toggle('collapsed');
+    };
+    head.addEventListener('click', toggle);
+    head.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault && e.preventDefault(); toggle(); }
+    });
+    return head;
+  }
+
   // ---------- array / string ----------
   function renderArray(container, list, opts){
     const { heap, pointers, colorCache, label, highlightIdx, compareIdx, mismatchIdx } = opts;
     const wrap = el('div', 'ds-block ds-array', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const flagsRow = el('div', 'array-flags-row', wrap);
     const cellsRow = el('div', 'array-cells-row', wrap);
     const idxRow = el('div', 'array-idx-row', wrap);
@@ -151,9 +185,10 @@
 
   // ---------- 2D grid ----------
   function renderGrid(container, list, opts){
-    const { heap, label, activeCell } = opts;
+    const { heap, label, activeCell, visitedCells } = opts;
     const wrap = el('div', 'ds-block ds-grid', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
+    const visitedKeys = new Set((visitedCells||[]).map(([r,c]) => r+','+c));
     const table = el('div', 'grid-table', wrap);
     list.items.forEach((rowRefItem, ri) => {
       const rowVal = deref(rowRefItem.value, heap);
@@ -162,6 +197,7 @@
         rowVal.items.forEach((cellItem, ci) => {
           const cell = el('div', 'grid-cell', rowEl);
           cell.setAttribute('data-flip-key', 'gcell:'+cellItem.id);
+          if (visitedKeys.has(ri+','+ci)) cell.classList.add('cell-visited');
           if (activeCell && activeCell[0]===ri && activeCell[1]===ci) cell.classList.add('cell-active');
           cell.textContent = fmtScalar(deref(cellItem.value, heap));
         });
@@ -174,7 +210,7 @@
   function renderStack(container, list, opts){
     const { heap, label } = opts;
     const wrap = el('div', 'ds-block ds-stack', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const body = el('div', 'stack-body', wrap);
     if (list.items.length === 0){ el('div', 'ds-empty', body).textContent = '(empty)'; return wrap; }
     const top = el('div', 'stack-top-flag', body);
@@ -195,7 +231,7 @@
   function renderQueue(container, list, opts){
     const { heap, label } = opts;
     const wrap = el('div', 'ds-block ds-queue', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const body = el('div', 'queue-body', wrap);
     el('div', 'queue-flag front', body).textContent = 'FRONT';
     const row = el('div', 'queue-row', body);
@@ -214,7 +250,7 @@
   function renderMap(container, dict, opts){
     const { heap, label } = opts;
     const wrap = el('div', 'ds-block ds-map', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label + (dict.isDefaultdict ? ' (defaultdict)' : '');
+    addHeader(wrap, label && (label + (dict.isDefaultdict ? ' (defaultdict)' : '')), label);
     const body = el('div', 'chip-row', wrap);
     dict.entries.forEach(e => {
       const chip = el('div', 'map-chip', body);
@@ -229,7 +265,7 @@
   function renderSet(container, set, opts){
     const { heap, label } = opts;
     const wrap = el('div', 'ds-block ds-set', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const body = el('div', 'chip-row', wrap);
     set.items.forEach(it => {
       const chip = el('div', 'set-chip', body);
@@ -244,7 +280,7 @@
   function renderLinkedList(container, headRef, heap, opts){
     const { label, pointers } = opts;
     const wrap = el('div', 'ds-block ds-linkedlist', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const nodes = [];
     const seen = new Map();
     let cur = headRef;
@@ -319,7 +355,7 @@
   function renderTree(container, rootRef, heap, opts){
     const { label } = opts;
     const wrap = el('div', 'ds-block ds-tree', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const rootObj = deref(rootRef, heap);
     if (!rootObj || rootObj.type !== 'object'){ el('div','ds-empty',wrap).textContent='None'; return wrap; }
     const nodes = []; const idToIdx = new Map(); let leafX = 0;
@@ -368,7 +404,7 @@
   function renderGraph(container, startRef, heap, opts){
     const { label } = opts;
     const wrap = el('div', 'ds-block ds-graph', container);
-    if (label) el('div', 'ds-label', wrap).textContent = label;
+    addHeader(wrap, label);
     const startObj = deref(startRef, heap);
     if (!startObj || startObj.type !== 'object'){ el('div','ds-empty',wrap).textContent='None'; return wrap; }
     const nodes = []; const idToIdx = new Map(); const edges = [];
@@ -414,6 +450,88 @@
     return wrap;
   }
 
+  // Adjacency-list graph: heapListObj is a PyList of PyLists, e.g.
+  // graph = [[1,2], [0,3,4], [0,5], [1], [1,6], [2], [4]]  ->  index i is a
+  // vertex, each entry in graph[i] is an edge to that vertex.
+  function renderAdjacencyGraph(container, heapListObj, heap, opts){
+    const { label, pointers } = opts;
+    const wrap = el('div', 'ds-block ds-graph', container);
+    addHeader(wrap, label);
+    const n = heapListObj.items.length;
+    if (n === 0){ el('div','ds-empty',wrap).textContent = '(empty)'; return wrap; }
+
+    const edges = [];
+    const seenEdge = new Set();
+    heapListObj.items.forEach((it, i) => {
+      const inner = deref(it.value, heap);
+      if (!inner || inner.type !== 'list') return;
+      for (const innerIt of inner.items){
+        const v = innerIt.value;
+        if (typeof v !== 'number' || v < 0 || v >= n) continue; // ignore anything not a valid vertex id
+        const a = i, b = v;
+        const k = a < b ? a+'-'+b : b+'-'+a;
+        if (seenEdge.has(k) && a !== b) continue;
+        seenEdge.add(k);
+        edges.push([a, b]);
+      }
+    });
+
+    const R = 19, CX = 160, CY = 150, RADIUS = Math.max(80, n * 13);
+    const svg = svgEl('svg', { viewBox:`0 0 ${CX*2} ${CY*2}`, class:'graph-svg', style:`width:${CX*2}px;height:${CY*2}px` });
+    const g = svgEl('g'); svg.appendChild(g);
+    const positions = [];
+    for (let i = 0; i < n; i++){
+      const angle = (2*Math.PI*i)/n - Math.PI/2;
+      positions.push({ x: CX + RADIUS*Math.cos(angle), y: CY + RADIUS*Math.sin(angle) });
+    }
+
+    const activeIdx = new Set((pointers||[]).map(p => p.idx).filter(i => i>=0 && i<n));
+    const activeEdgeKey = (pointers||[]).length >= 2 ? (() => {
+      const idxs = pointers.map(p=>p.idx).filter(i=>i>=0&&i<n);
+      if (idxs.length < 2) return null;
+      const a = idxs[idxs.length-2], b = idxs[idxs.length-1];
+      return a<b ? a+'-'+b : b+'-'+a;
+    })() : null;
+
+    for (const [a,b] of edges){
+      const k = a<b?a+'-'+b:b+'-'+a;
+      const isActive = k === activeEdgeKey;
+      g.appendChild(svgEl('line', {
+        x1:positions[a].x, y1:positions[a].y, x2:positions[b].x, y2:positions[b].y,
+        class: 'graph-edge' + (isActive ? ' graph-edge-active' : '')
+      }));
+    }
+    for (let i = 0; i < n; i++){
+      const p = positions[i];
+      const isActive = activeIdx.has(i);
+      g.appendChild(svgEl('circle', { cx:p.x, cy:p.y, r:R, class:'graph-node' + (isActive ? ' graph-node-active' : '') }));
+      const txt = svgEl('text', { x:p.x, y:p.y+5, class:'graph-val', 'text-anchor':'middle' });
+      txt.textContent = String(i);
+      g.appendChild(txt);
+    }
+    // pointer flags (vertex/neighbour/etc) above the node they currently reference
+    const byIdx = new Map();
+    for (const ptr of (pointers||[])){
+      if (ptr.idx < 0 || ptr.idx >= n) continue;
+      if (!byIdx.has(ptr.idx)) byIdx.set(ptr.idx, []);
+      byIdx.get(ptr.idx).push(ptr.name);
+    }
+    byIdx.forEach((names, idx) => {
+      const p = positions[idx];
+      names.forEach((name, fi) => {
+        const fy = p.y - R - 10 - fi*20;
+        const w = Math.max(34, name.length*7+12);
+        g.appendChild(svgEl('rect', { x:p.x-w/2, y:fy-13, width:w, height:17, rx:5, class:'ll-flag-bg' }));
+        const t = svgEl('text', { x:p.x, y:fy-1, class:'ll-flag-txt', 'text-anchor':'middle' });
+        t.textContent = name;
+        g.appendChild(t);
+      });
+    });
+
+    wrap.appendChild(svg);
+    return wrap;
+  }
+
   // ---------- scalar chips ----------
   function renderScalars(container, entries){
     const wrap = el('div', 'ds-block ds-scalars', container);
@@ -433,7 +551,9 @@
   function renderCallStack(container, frames){
     if (frames.length <= 1) return null; // only globals, no active calls
     const wrap = el('div', 'ds-block ds-callstack', container);
-    el('div', 'ds-label', wrap).textContent = `CALL STACK (depth ${frames.length-1})`;
+    // Fixed key (not the label) — the label's depth number changes every
+    // step, but we want collapse state to stay put across those changes.
+    addHeader(wrap, `CALL STACK (depth ${frames.length-1})`, 'call-stack');
     const body = el('div', 'callstack-body', wrap);
     for (let i = frames.length - 1; i >= 1; i--){
       const f = frames[i];
@@ -455,8 +575,9 @@
 
   const exportObj = {
     el, svgEl, fmtScalar, isRef, deref, flipCapture, flipApply, collectPointers, pointersForIndex, colorForName,
+    addHeader,
     renderArray, renderGrid, renderStack, renderQueue, renderMap, renderSet, renderLinkedList, renderTree, renderGraph,
-    renderScalars, renderCallStack
+    renderScalars, renderCallStack, renderAdjacencyGraph
   };
   if (typeof module !== 'undefined') module.exports = exportObj;
   else window.PyRenderer = exportObj;

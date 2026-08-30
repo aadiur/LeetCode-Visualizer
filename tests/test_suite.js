@@ -287,5 +287,61 @@ def koko(piles, h):
 print(koko([3,6,7,11], 8))
 `, 'Koko Eating Bananas', '4');
 
+// --- regression test for the grid-vs-adjacency-list role classifier ---
+{
+  const { runPython, computeRoles, pickVizVars } = require('../engine/engine.js');
+  function checkRole(label, src, varName, expectedKind, expectedOutput){
+    const res = runPython(src, { maxSteps: 10000, maxMs: 8000 });
+    if (res.error){ fail++; console.log('ERR  ' + label + ': ' + res.error.type + ' ' + res.error.message); return; }
+    const out = res.output.join('|');
+    const roles = computeRoles(res.steps);
+    const last = res.steps[res.steps.length - 1];
+    const vv = pickVizVars(last, roles);
+    const v = vv.find(x => x.name === varName);
+    const kindOk = v && v.kind === expectedKind;
+    const outOk = out === expectedOutput;
+    if (kindOk && outOk){ pass++; console.log('PASS ' + label + ' -> ' + varName + ':' + (v&&v.kind) + ', output=' + out); }
+    else { fail++; console.log('FAIL ' + label + ' -> ' + varName + ':' + (v&&v.kind) + ' (expected ' + expectedKind + '), output=' + out + ' (expected ' + expectedOutput + ')'); }
+  }
+
+  checkRole('Adjacency-list graph classifies as adjacency_list (not grid)', `
+def dfs(graph, vertex, visited):
+    visited[vertex] = True
+    print(vertex, end=' ')
+    for neighbour in graph[vertex]:
+        if visited[neighbour] == False:
+            dfs(graph, neighbour, visited)
+V = 7
+graph = [[] for i in range(V)]
+graph[0].append(1); graph[0].append(2)
+graph[1].append(0); graph[1].append(3); graph[1].append(4)
+graph[2].append(0); graph[2].append(5)
+graph[3].append(1); graph[4].append(1); graph[4].append(6)
+graph[5].append(2); graph[6].append(4)
+visited = [False]*V
+dfs(graph, 0, visited)
+`, 'graph', 'adjacency_list', '0 1 3 4 6 2 5 ');
+
+  checkRole('Binary island grid classifies as grid (not adjacency_list)', `
+def numIslands(grid):
+    rows, cols = len(grid), len(grid[0])
+    visited = set()
+    def dfs(i, j):
+        if i<0 or j<0 or i>=rows or j>=cols or (i,j) in visited or grid[i][j]==0:
+            return
+        visited.add((i,j))
+        dfs(i+1,j); dfs(i-1,j); dfs(i,j+1); dfs(i,j-1)
+    count = 0
+    for i in range(rows):
+        for j in range(cols):
+            if grid[i][j]==1 and (i,j) not in visited:
+                dfs(i,j)
+                count += 1
+    return count
+grid = [[1,1,0],[0,1,0],[0,0,1]]
+print(numIslands(grid))
+`, 'grid', 'grid', '2');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

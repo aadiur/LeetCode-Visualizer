@@ -263,7 +263,16 @@
         }
         case 'stack': R.renderStack(vizScroll, v.heapObj, { heap, label }); break;
         case 'queue': R.renderQueue(vizScroll, v.heapObj, { heap, label }); break;
-        case 'grid': R.renderGrid(vizScroll, v.heapObj, { heap, label }); break;
+        case 'grid': {
+          const { activeCell, visitedCells } = E.computeGridOverlay(step, v.heapObj, heap);
+          R.renderGrid(vizScroll, v.heapObj, { heap, label, activeCell, visitedCells });
+          break;
+        }
+        case 'adjacency_list': {
+          const pointers = R.collectPointers(step.world.frames, v.heapObj.id).filter(p => p.name !== v.name);
+          R.renderAdjacencyGraph(vizScroll, v.heapObj, heap, { label, pointers });
+          break;
+        }
         case 'map': R.renderMap(vizScroll, v.heapObj, { heap, label }); break;
         case 'set': R.renderSet(vizScroll, v.heapObj, { heap, label }); break;
         case 'tuple': R.renderArray(vizScroll, v.heapObj, { heap, pointers: [], colorCache, label: label + ' (tuple)' }); break;
@@ -272,7 +281,7 @@
         case 'graph': R.renderGraph(vizScroll, v.ref, heap, { label }); break;
         case 'object': {
           const wrap = R.el('div', 'ds-block ds-map', vizScroll);
-          R.el('div', 'ds-label', wrap).textContent = label + '  (' + v.heapObj.className + ')';
+          R.addHeader(wrap, label + '  (' + v.heapObj.className + ')', label);
           const row = R.el('div', 'chip-row', wrap);
           for (const k in v.heapObj.attrs){
             const val = v.heapObj.attrs[k];
