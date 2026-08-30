@@ -153,6 +153,15 @@
   transform: translateY(0) !important;
 }
 
+.lcv-floating-btn {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  z-index: 999998 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
+}
+
+
 .lcv-button-primary {
   background: linear-gradient(135deg, var(--lcv-accent), var(--lcv-accent-dark));
   color: #0a0e27;

@@ -1,48 +1,55 @@
 {
   "manifest_version": 3,
   "name": "LeetCode Algorithm Visualizer",
-  "version": "1.0.0",
-  "description": "Visualize your LeetCode algorithm execution in real-time. Watch arrays, stacks, queues, and trees animate as your code runs.",
-  
-  "permissions": [
-    "scripting",
-    "webRequest",
-    "tabs"
-  ],
-  
+  "version": "2.0.0",
+  "description": "Visualize your LeetCode algorithm execution in real-time using a real in-browser Python interpreter. Watch arrays, 2D grids, stacks, queues, linked lists, trees, and graphs animate as your code actually runs — including recursion.",
+
+  "permissions": [],
+
   "host_permissions": [
     "https://leetcode.com/*",
     "https://leetcode.cn/*"
   ],
-  
+
   "action": {
     "default_popup": "popup.html",
-    "default_title": "LeetCode Visualizer"
+    "default_title": "Algorithm Visualizer"
   },
-  
+
   "icons": {
-    "16": "icons/icon-16.png",
-    "48": "icons/icon-48.png",
-    "128": "icons/icon-128.png",
-    "256": "icons/icon-256.png"
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
-  
+
   "content_scripts": [
     {
       "matches": ["https://leetcode.com/*", "https://leetcode.cn/*"],
-      "js": ["content/detector.js", "content/code-extractor.js", "content/content.js"],
-      "css": ["content/panel.css"],
+      "js": [
+        "engine/lexer.js",
+        "engine/parser.js",
+        "engine/runtime.js",
+        "engine/interpreter.js",
+        "engine/detector.js",
+        "engine/engine.js",
+        "engine/renderer.js",
+        "content/detector.js",
+        "content/code-extractor.js",
+        "content/content.js"
+      ],
+      "css": ["content/panel.css", "content/panel-viz.css"],
       "run_at": "document_idle"
     }
   ],
-  
+
   "background": {
     "service_worker": "background.js"
   },
-  
+
   "web_accessible_resources": [
     {
-      "resources": ["content/panel.html"],
+      "resources": ["leetcode-visualizer.html", "engine/*"],
       "matches": ["https://leetcode.com/*", "https://leetcode.cn/*"]
     }
   ]

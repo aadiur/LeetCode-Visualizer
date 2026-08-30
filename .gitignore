@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Node (only used for the build script + tests — no runtime deps)
+node_modules/
+npm-debug.log*
+
+# Packed extension artifacts
+*.zip
+*.crx
+*.pem
+
+# Scratch
+/tmp/
+*.local.*

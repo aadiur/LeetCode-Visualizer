@@ -1,0 +1,87 @@
+/* Scoped copy of the visualizer's data-structure component styles.
+   Everything is namespaced under #lcv-panel-container so it can never leak
+   into LeetCode's own page styling. */
+#lcv-panel-container{
+  --void:#090c11; --panel:#10151d; --panel-2:#141c27; --inset:#0b0f16;
+  --line:#212b37; --line-soft:#181f29; --text-hi:#e9eff5; --text-mid:#8ea0b2; --text-dim:#4d5a68;
+  --accent:#3fe0c5; --accent-dim:rgba(63,224,197,.13); --accent-glow:rgba(63,224,197,.35);
+  --blue:#5b8def; --blue-dim:rgba(91,141,239,.14); --warn:#f0a93b; --warn-dim:rgba(240,169,59,.14);
+  --danger:#ff6b6b; --danger-dim:rgba(255,107,107,.14); --violet:#a78bfa; --violet-dim:rgba(167,139,250,.14);
+  --pink:#ff8fd6; --font-mono:'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-sans:'Space Grotesk', ui-sans-serif, system-ui, sans-serif; --ll-arrow:#5b8def;
+}
+#lcv-panel-container .ds-block{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+#lcv-panel-container .ds-label{ font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--text-mid); font-weight:700; margin-bottom:8px; font-family:var(--font-sans); }
+#lcv-panel-container .ds-empty{ color:var(--text-dim); font-family:var(--font-mono); font-size:12px; }
+
+#lcv-panel-container .array-flags-row{ display:flex; }
+#lcv-panel-container .array-flag-slot{ display:flex; flex-direction:column-reverse; align-items:center; gap:3px; min-height:20px; }
+#lcv-panel-container .ptr-flag{ background:var(--flag-color,var(--accent)); color:#041018; font-family:var(--font-mono); font-size:9.5px; font-weight:800; padding:2px 6px; border-radius:5px; white-space:nowrap; }
+#lcv-panel-container .array-cells-row{ display:flex; }
+#lcv-panel-container .array-idx-row{ display:flex; }
+#lcv-panel-container .array-cell{ width:38px; height:38px; margin:2px; border-radius:7px; background:var(--inset); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:12.5px; font-weight:600; color:var(--text-hi); flex-shrink:0; }
+#lcv-panel-container .cell-val{ line-height:1; }
+#lcv-panel-container .array-idx-cell{ width:42px; text-align:center; font-family:var(--font-mono); font-size:9.5px; color:var(--text-dim); flex-shrink:0; }
+#lcv-panel-container .cell-active{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); background:var(--accent-dim); }
+#lcv-panel-container .cell-compare{ border-color:var(--warn); background:var(--warn-dim); }
+#lcv-panel-container .cell-mismatch{ border-color:var(--danger); background:var(--danger-dim); }
+
+#lcv-panel-container .grid-table{ display:inline-flex; flex-direction:column; gap:2px; }
+#lcv-panel-container .grid-row{ display:flex; gap:2px; }
+#lcv-panel-container .grid-cell{ width:34px; height:34px; background:var(--inset); border:1px solid var(--line); border-radius:5px; display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:11.5px; color:var(--text-hi); }
+
+#lcv-panel-container .stack-body{ display:flex; flex-direction:column; align-items:center; }
+#lcv-panel-container .stack-top-flag{ display:flex; flex-direction:column; align-items:center; margin-bottom:2px; }
+#lcv-panel-container .stack-top-flag span{ font-family:var(--font-mono); font-size:9.5px; font-weight:800; color:var(--warn); letter-spacing:1px; }
+#lcv-panel-container .stack-top-arrow{ width:0;height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-top:6px solid var(--warn); margin-top:2px; }
+#lcv-panel-container .stack-col{ display:flex; flex-direction:column-reverse; }
+#lcv-panel-container .stack-cell{ width:78px; height:34px; margin:2px 0; border-radius:6px; background:var(--inset); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:12px; color:var(--text-hi); }
+#lcv-panel-container .stack-base{ width:98px; height:4px; background:var(--line); border-radius:3px; margin-top:4px; }
+
+#lcv-panel-container .queue-body{ display:flex; align-items:center; gap:8px; }
+#lcv-panel-container .queue-flag{ font-family:var(--font-mono); font-size:9.5px; font-weight:800; color:var(--blue); letter-spacing:1px; }
+#lcv-panel-container .queue-row{ display:flex; }
+
+#lcv-panel-container .chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+#lcv-panel-container .map-chip{ display:flex; align-items:center; gap:4px; background:var(--inset); border:1px solid var(--line); border-radius:6px; padding:4px 8px; font-family:var(--font-mono); font-size:11px; }
+#lcv-panel-container .chip-key{ color:var(--blue); }
+#lcv-panel-container .chip-sep{ color:var(--text-dim); }
+#lcv-panel-container .chip-val{ color:var(--text-hi); }
+#lcv-panel-container .set-chip{ background:var(--violet-dim); border:1px solid var(--violet); color:var(--violet); border-radius:6px; padding:4px 8px; font-family:var(--font-mono); font-size:11px; font-weight:600; }
+
+#lcv-panel-container .scalar-chip{ display:flex; align-items:center; gap:4px; background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:4px 8px; font-family:var(--font-mono); font-size:11px; }
+#lcv-panel-container .scalar-name{ color:var(--text-mid); }
+#lcv-panel-container .scalar-eq{ color:var(--text-dim); }
+#lcv-panel-container .scalar-val{ color:var(--text-hi); font-weight:700; }
+#lcv-panel-container .scalar-chip.bool-true .scalar-val{ color:var(--accent); }
+#lcv-panel-container .scalar-chip.bool-false .scalar-val{ color:var(--danger); }
+#lcv-panel-container .scalar-chip.is-none .scalar-val{ color:var(--text-dim); }
+
+#lcv-panel-container .callstack-body{ display:flex; flex-direction:column; gap:5px; }
+#lcv-panel-container .callstack-frame{ border:1px solid var(--line); border-radius:7px; padding:6px 8px; background:var(--inset); }
+#lcv-panel-container .callstack-frame.frame-active{ border-color:var(--pink); }
+#lcv-panel-container .frame-head{ font-family:var(--font-mono); font-size:10.5px; color:var(--pink); font-weight:700; margin-bottom:4px; }
+#lcv-panel-container .frame-vars{ display:flex; flex-wrap:wrap; gap:4px; }
+#lcv-panel-container .frame-var-chip{ font-family:var(--font-mono); font-size:9.5px; background:var(--panel-2); color:var(--text-mid); padding:2px 6px; border-radius:4px; }
+
+#lcv-panel-container .ds-linkedlist, #lcv-panel-container .ds-tree, #lcv-panel-container .ds-graph{ overflow-x:auto; }
+#lcv-panel-container .ll-svg, #lcv-panel-container .tree-svg, #lcv-panel-container .graph-svg{ display:block; margin:2px auto 0; }
+#lcv-panel-container .ll-node{ fill:var(--inset); stroke:var(--blue); stroke-width:1.5; }
+#lcv-panel-container .ll-val{ fill:var(--text-hi); font-family:var(--font-mono); font-size:13px; font-weight:700; }
+#lcv-panel-container .ll-edge{ stroke:var(--blue); stroke-width:2; fill:none; }
+#lcv-panel-container .ll-null{ fill:var(--text-dim); font-family:var(--font-mono); font-size:10px; }
+#lcv-panel-container .ll-flag-bg{ fill:var(--pink); }
+#lcv-panel-container .ll-flag-txt{ fill:#22001a; font-family:var(--font-mono); font-size:9px; font-weight:800; }
+#lcv-panel-container .ll-flag-stem{ stroke:var(--pink); stroke-width:1.5; stroke-dasharray:2,2; }
+#lcv-panel-container .tree-node{ fill:var(--inset); stroke:var(--violet); stroke-width:1.5; }
+#lcv-panel-container .tree-val{ fill:var(--text-hi); font-family:var(--font-mono); font-size:11px; font-weight:700; }
+#lcv-panel-container .tree-edge{ stroke:var(--line); stroke-width:2; }
+#lcv-panel-container .graph-node{ fill:var(--inset); stroke:var(--accent); stroke-width:1.5; }
+#lcv-panel-container .graph-val{ fill:var(--text-hi); font-family:var(--font-mono); font-size:10px; font-weight:700; }
+#lcv-panel-container .graph-edge{ stroke:var(--line); stroke-width:1.5; }
+
+#lcv-panel-container .trace-mini{ font-family:var(--font-mono); font-size:11px; color:var(--text-mid); background:var(--panel-2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+#lcv-panel-container .trace-mini .nk{ color:var(--accent); font-weight:700; }
+
+#lcv-panel-container .flip-enter{ opacity:0; transform:scale(.6); }
+#lcv-panel-container .flip-enter-active{ opacity:1; transform:scale(1); transition:opacity 240ms ease, transform 240ms cubic-bezier(.2,.8,.2,1); }

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Algorithm Visualizer</title>
+<style>
+  body{ width:280px; margin:0; background:#0a0e27; color:#e9ecef; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; }
+  .hdr{ display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid #1e2749; }
+  .badge{ width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#3fe0c5,#2bb5a0); display:flex;align-items:center;justify-content:center; font-weight:800; font-size:11px; color:#0a0e27; }
+  h1{ font-size:13px; margin:0; }
+  p{ font-size:12px; color:#a0a7b8; line-height:1.5; padding:0 16px; }
+  .body{ padding:6px 0 14px; }
+  ul{ margin:6px 0; padding-left:18px; font-size:12px; color:#a0a7b8; line-height:1.6; }
+  .btn{ display:block; margin:10px 16px 0; text-align:center; padding:9px; background:linear-gradient(135deg,#3fe0c5,#2bb5a0); color:#0a0e27; font-weight:700; font-size:12px; border-radius:7px; text-decoration:none; }
+  .note{ font-size:11px; color:#6b7488; padding:10px 16px 4px; }
+</style>
+</head>
+<body>
+  <div class="hdr">
+    <div class="badge">AIR</div>
+    <h1>Algorithm Visualizer</h1>
+  </div>
+  <div class="body">
+    <p>Open any LeetCode problem and click <b>Visualize Execution</b> next to the Submit button. Runs a real Python interpreter in your browser — no server needed.</p>
+    <ul>
+      <li>Arrays, 2D grids, stacks, queues</li>
+      <li>Linked lists, trees, graphs</li>
+      <li>Recursion with a live call stack</li>
+    </ul>
+    <p class="note">Currently: full real-interpreter support for Python. Other languages are not yet supported in-page — switch LeetCode to Python3.</p>
+    <a class="btn" href="leetcode-visualizer.html" target="_blank">Open standalone visualizer</a>
+  </div>
+</body>
+</html>

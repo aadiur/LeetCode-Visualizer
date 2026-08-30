@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Algorithm Visualizer — real Python execution</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+__CSS__
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-badge">AIR</div>
+      <div class="brand-text">
+        <h1>Algorithm Intermediate Representation</h1>
+        <p><span class="live-dot"></span>real Python interpreter — any array / stack / linked-list / tree / graph problem</p>
+      </div>
+    </div>
+    <div class="lang-chips">
+      <div class="lang-chip active" data-lang="python">Python</div>
+      <div class="lang-chip" data-lang="cpp">C++<span class="beta-dot">β</span></div>
+      <div class="lang-chip" data-lang="java">Java<span class="beta-dot">β</span></div>
+      <div class="lang-chip" data-lang="javascript">JavaScript<span class="beta-dot">β</span></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="run-btn" id="runBtn">▶ Run &amp; Visualize</button>
+  </div>
+
+  <div id="errorBanner" class="error-banner"></div>
+
+  <div class="main">
+    <div class="panel col-source">
+      <div class="panel-head">
+        <span class="ph-title">Source</span>
+        <span class="ph-meta">always editable</span>
+      </div>
+      <div class="source-edit-wrap">
+        <div id="lineHighlight" class="line-highlight-bar"></div>
+        <div id="errLineMarker" class="line-highlight-bar"></div>
+        <textarea id="sourceEdit" class="source-edit" spellcheck="false"></textarea>
+      </div>
+      <div id="entryBar" class="entry-bar" style="display:none;">
+        <div><b>No driver call found</b> — I generated one automatically. Edit &amp; press Enter to override:</div>
+        <div id="entryNote" style="margin:4px 0 6px;color:var(--text-dim);"></div>
+        <input id="entryInput" type="text" placeholder='e.g. Solution().isValid("([)]")'>
+      </div>
+      <div id="langNotice" class="entry-bar" style="display:none;color:var(--warn);"></div>
+      <div class="live-row">
+        <label><input type="checkbox" id="liveToggle" checked> Live — animate while typing</label>
+        <span id="liveStatus" class="live-status ok">live</span>
+      </div>
+    </div>
+
+    <div class="panel col-trace">
+      <div class="panel-head">
+        <span class="ph-title">Execution Trace</span>
+        <span class="ph-meta" id="stepMeta"></span>
+      </div>
+      <div id="traceScroll" class="trace-scroll"></div>
+    </div>
+
+    <div class="panel col-viz">
+      <div class="panel-head">
+        <span class="ph-title">Visualization</span>
+      </div>
+      <div class="viz-scroll" id="vizScroll">
+        <div id="narration" class="narration">Press Run to execute.</div>
+      </div>
+      <div class="panel-head" style="border-top:1px solid var(--line);border-bottom:none;">
+        <span class="ph-title">Output</span>
+      </div>
+      <div id="outputConsole" class="output-console" style="margin:0 14px 14px;"></div>
+    </div>
+  </div>
+
+  <div class="live-bar">
+    <button class="tl-btn" id="restartBtn" title="Restart animation">↺ Restart</button>
+    <div class="speed-group">
+      <span class="speed-label">Speed</span>
+      <button class="speed-btn" data-speed="1400">0.5×</button>
+      <button class="speed-btn active" data-speed="550">1×</button>
+      <button class="speed-btn" data-speed="220">2×</button>
+    </div>
+    <div class="spacer"></div>
+    <span class="live-progress" id="liveProgress"></span>
+  </div>
+
+</div>
+
+<script>
+__JS__
+</script>
+</body>
+</html>
